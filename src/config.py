@@ -37,3 +37,28 @@ MISSING_FILL_VALUE = "Unknown"
 
 RARE_COUNTRY_THRESHOLD = 0.01
 OTHER_COUNTRY_LABEL = "Other"
+
+# Education level and years of education are two encodings of the same
+# attribute and correspond one to one throughout the dataset. The mapping is
+# recorded here so the interface can ask for the level only and derive the
+# numeric form, rather than defaulting a field the user has effectively
+# already answered. Verify with:
+#   train.groupby("education")["education-num"].nunique().max() == 1
+EDUCATION_NUM = {
+    "Preschool": 1,
+    "1st-4th": 2,
+    "5th-6th": 3,
+    "7th-8th": 4,
+    "9th": 5,
+    "10th": 6,
+    "11th": 7,
+    "12th": 8,
+    "HS-grad": 9,
+    "Some-college": 10,
+    "Assoc-voc": 11,
+    "Assoc-acdm": 12,
+    "Bachelors": 13,
+    "Masters": 14,
+    "Prof-school": 15,
+    "Doctorate": 16,
+}
