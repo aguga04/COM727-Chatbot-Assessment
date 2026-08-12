@@ -8,6 +8,11 @@
   "automated_accuracy": 0.9359357489727307,
   "referred_accuracy": 0.5918895599654875,
   "accuracy_gain": 0.06122363473965842,
+  "band_actual_rates": {
+    "below": 0.055814987769624194,
+    "referred": 0.47627264883520276,
+    "above": 0.8926487747957993
+  },
   "calibration": {
     "brier_score": 0.08627821759745226,
     "expected_calibration_error": 0.006148024002436424,
