@@ -1,0 +1,87 @@
+{
+  "lower": 0.3,
+  "upper": 0.7,
+  "selected_on": "validation split",
+  "validation_records": 6513,
+  "baseline_accuracy_single_threshold": 0.8747121142330723,
+  "referral_rate": 0.17795178873023185,
+  "automated_accuracy": 0.9359357489727307,
+  "referred_accuracy": 0.5918895599654875,
+  "accuracy_gain": 0.06122363473965842,
+  "calibration": {
+    "brier_score": 0.08627821759745226,
+    "expected_calibration_error": 0.006148024002436424,
+    "bins": [
+      {
+        "bin": 0,
+        "count": 3520,
+        "mean_predicted": 0.019688742235302925,
+        "observed_rate": 0.02130681818181818,
+        "gap": 0.0016180759465152551
+      },
+      {
+        "bin": 1,
+        "count": 557,
+        "mean_predicted": 0.14773474633693695,
+        "observed_rate": 0.14183123877917414,
+        "gap": -0.0059035075577628104
+      },
+      {
+        "bin": 2,
+        "count": 420,
+        "mean_predicted": 0.25020140409469604,
+        "observed_rate": 0.23095238095238096,
+        "gap": -0.01924902314231508
+      },
+      {
+        "bin": 3,
+        "count": 330,
+        "mean_predicted": 0.34993821382522583,
+        "observed_rate": 0.3393939393939394,
+        "gap": -0.010544274431286416
+      },
+      {
+        "bin": 4,
+        "count": 338,
+        "mean_predicted": 0.44711706042289734,
+        "observed_rate": 0.45857988165680474,
+        "gap": 0.011462821233907405
+      },
+      {
+        "bin": 5,
+        "count": 237,
+        "mean_predicted": 0.5461766719818115,
+        "observed_rate": 0.5527426160337553,
+        "gap": 0.006565944051943773
+      },
+      {
+        "bin": 6,
+        "count": 254,
+        "mean_predicted": 0.6510374546051025,
+        "observed_rate": 0.6062992125984252,
+        "gap": -0.04473824200667731
+      },
+      {
+        "bin": 7,
+        "count": 262,
+        "mean_predicted": 0.746069610118866,
+        "observed_rate": 0.7480916030534351,
+        "gap": 0.0020219929345691723
+      },
+      {
+        "bin": 8,
+        "count": 140,
+        "mean_predicted": 0.8425066471099854,
+        "observed_rate": 0.8571428571428571,
+        "gap": 0.014636210032871744
+      },
+      {
+        "bin": 9,
+        "count": 455,
+        "mean_predicted": 0.9870793223381042,
+        "observed_rate": 0.9868131868131869,
+        "gap": -0.000266135524917388
+      }
+    ]
+  }
+}
