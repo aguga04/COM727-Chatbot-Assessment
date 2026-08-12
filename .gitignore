@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project specific
+outputs/*
+!outputs/.gitkeep
+.venv*/
+.vscode/
+.DS_Store
+Thumbs.db
