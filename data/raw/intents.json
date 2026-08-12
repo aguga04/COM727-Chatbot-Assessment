@@ -1,0 +1,851 @@
+{
+  "meta": {
+    "description": "Training data for the intent classifier and source of the question buttons shown in the interface. Each intent carries a display string that is excluded from its own patterns, so classifying a button click is a genuine generalisation rather than a lookup.",
+    "response_placeholders": "Braced names in responses are filled at run time by the response engine from live model output. No figure is stored here.",
+    "show_when": "always means the question is offered at any time. after_assessment means it is offered only once a person has been scored."
+  },
+  "intents": [
+    {
+      "tag": "greeting",
+      "category": "Conversation",
+      "show_when": "always",
+      "display": "Hello",
+      "patterns": [
+        "hi",
+        "hey there",
+        "good morning",
+        "hello there",
+        "hi again",
+        "hey",
+        "morning",
+        "good evening"
+      ],
+      "responses": [
+        "Hello. Describe a person on the assessment tab and I can explain what the model predicts and why.",
+        "Hi. I can walk you through any prediction this model makes, or answer questions about the data behind it.",
+        "Good to see you. Fill in the details on the assessment tab, or ask me about the model itself."
+      ]
+    },
+    {
+      "tag": "goodbye",
+      "category": "Conversation",
+      "show_when": "always",
+      "display": "Goodbye",
+      "patterns": [
+        "bye",
+        "see you later",
+        "that is all thanks",
+        "i am done here",
+        "ok goodbye then",
+        "bye for now",
+        "i will close this now",
+        "we are finished"
+      ],
+      "responses": [
+        "Goodbye. Remember that nothing here is advice about a real person.",
+        "Take care. The limitations tab is worth reading before you take any of this seriously.",
+        "Bye for now."
+      ]
+    },
+    {
+      "tag": "thanks",
+      "category": "Conversation",
+      "show_when": "always",
+      "display": "Thank you",
+      "patterns": [
+        "thanks",
+        "cheers for that",
+        "much appreciated",
+        "that was helpful thank you",
+        "thanks a lot",
+        "ta very much",
+        "appreciate the help",
+        "thank you for explaining"
+      ],
+      "responses": [
+        "You are welcome.",
+        "Glad that helped. Ask me anything else about the prediction or the model.",
+        "No problem at all."
+      ]
+    },
+    {
+      "tag": "capabilities",
+      "category": "Conversation",
+      "show_when": "always",
+      "display": "What can you help me with?",
+      "patterns": [
+        "what can you do",
+        "help me",
+        "what questions can i ask",
+        "what are you for",
+        "how do i use this",
+        "what can you help with",
+        "what topics do you cover",
+        "what should i ask you"
+      ],
+      "responses": [
+        "I can explain any prediction this model makes, break down which attributes drove it, describe how the model was built and evaluated, and set out where it should not be trusted.",
+        "Ask me about a prediction and its reasoning, about the algorithm and its accuracy, about the census data behind it, or about the fairness problems it carries.",
+        "Four areas: the current assessment, the explanation behind it, the model and its evaluation, and the limitations of the whole thing."
+      ]
+    },
+    {
+      "tag": "who_built_this",
+      "category": "Conversation",
+      "show_when": "always",
+      "display": "Who built this and why?",
+      "patterns": [
+        "who made you",
+        "who created this app",
+        "why does this exist",
+        "what is this project",
+        "who is behind this",
+        "who built the thing",
+        "why was this built",
+        "what is the purpose of this project"
+      ],
+      "responses": [
+        "This was built for a postgraduate machine learning assessment. It demonstrates a decision support pattern on public census data, and it is not a product.",
+        "It is a student project for a machine learning module, built to show how a prediction can be explained and where such a system breaks down.",
+        "A university coursework build. The point is the reasoning and the limitations, not the predictions themselves."
+      ]
+    },
+    {
+      "tag": "out_of_scope",
+      "category": "Conversation",
+      "show_when": "always",
+      "display": "Something else",
+      "patterns": [
+        "what is the weather",
+        "tell me a joke",
+        "who won the football",
+        "book me a flight",
+        "what time is it",
+        "sing me a song",
+        "something else entirely",
+        "can we talk about something different"
+      ],
+      "responses": [
+        "That is outside what I can help with. I only answer questions about this model, its predictions and the data behind it.",
+        "I cannot help with that. Try asking about the current assessment, the algorithm, or the limitations.",
+        "Not something I can answer. My scope is this income model and nothing else."
+      ]
+    },
+    {
+      "tag": "verdict",
+      "category": "This prediction",
+      "show_when": "after_assessment",
+      "display": "What did the model decide?",
+      "handler": "verdict",
+      "patterns": [
+        "what is the result",
+        "what did it say",
+        "give me the outcome",
+        "what is the verdict for this person",
+        "so what is the answer",
+        "what did the model conclude",
+        "what has it decided",
+        "tell me the decision"
+      ],
+      "responses": [
+        "{band_label}. The model puts the probability of the upper bracket at {probability_pct}. {band_action}",
+        "This case falls in the {band_label} band at {probability_pct}. {band_action}",
+        "At {probability_pct} the model places this person in the {band_label} band. {band_action}"
+      ]
+    },
+    {
+      "tag": "probability",
+      "category": "This prediction",
+      "show_when": "after_assessment",
+      "display": "How likely is the upper bracket?",
+      "handler": "probability",
+      "patterns": [
+        "what is the probability",
+        "what are the odds",
+        "how likely is this person to be above",
+        "what percentage did you give",
+        "what is the score",
+        "how likely is the upper bracket for them",
+        "chance of the higher bracket",
+        "what probability came out"
+      ],
+      "responses": [
+        "The model gives {probability_pct}. That is the probability of this person falling above the census threshold, not an estimate of what they earn.",
+        "{probability_pct}. Read that as the chance of being above the threshold, not as an income figure.",
+        "It comes out at {probability_pct} for the upper bracket. The model has no way to estimate an actual salary."
+      ]
+    },
+    {
+      "tag": "band_meaning",
+      "category": "This prediction",
+      "show_when": "after_assessment",
+      "display": "What does that band mean?",
+      "handler": "band_meaning",
+      "patterns": [
+        "what does the band mean",
+        "explain the category",
+        "what does that classification mean",
+        "why is it in that group",
+        "meaning of this band",
+        "what does that band actually tell me",
+        "explain what this band means",
+        "what is this band about"
+      ],
+      "responses": [
+        "{band_interpretation} The band covers {band_range}.",
+        "This case sits in {band_range}. {band_interpretation}",
+        "{band_interpretation} Anything in {band_range} is treated the same way."
+      ]
+    },
+    {
+      "tag": "referral_meaning",
+      "category": "This prediction",
+      "show_when": "always",
+      "display": "Why would a case be referred to a person?",
+      "handler": "referral_meaning",
+      "patterns": [
+        "what is the referral band",
+        "why send it to a human",
+        "what does refer mean",
+        "why not just decide it",
+        "what happens in the middle band",
+        "why would you refer a case",
+        "when does a case go to a person",
+        "why is a person needed for some cases"
+      ],
+      "responses": [
+        "Cases between {lower} and {upper} go to a person because the model cannot separate them. {referred_actual_pct} of records in that band genuinely fall above the threshold, and the model is only {referred_accuracy_pct} accurate on them.",
+        "The referral band exists because those predictions carry almost no information. Inside it, {referred_actual_pct} are actually above the threshold, which is close to an even split.",
+        "Between {lower} and {upper} the model is near chance, at {referred_accuracy_pct} accuracy. Sending those {referral_rate_pct} of cases to an assessor is more honest than guessing."
+      ]
+    },
+    {
+      "tag": "threshold_meaning",
+      "category": "This prediction",
+      "show_when": "always",
+      "display": "What is the income threshold?",
+      "handler": "threshold_meaning",
+      "patterns": [
+        "what threshold are you using",
+        "above or below what amount",
+        "what is the cutoff",
+        "fifty thousand what",
+        "which income line",
+        "what income threshold is this",
+        "what is the threshold amount",
+        "what income level splits the brackets"
+      ],
+      "responses": [
+        "Fifty thousand US dollars a year, as recorded in the 1994 census. It has never been adjusted, so it no longer marks the same position in the income distribution.",
+        "The census split its records at fifty thousand dollars in 1994. That is the only boundary this model knows, and it is three decades out of date.",
+        "It is the 1994 census boundary of fifty thousand US dollars. Nothing here is converted to present day money or to another currency."
+      ]
+    },
+    {
+      "tag": "top_factor",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "Which factor mattered most?",
+      "handler": "top_factor",
+      "patterns": [
+        "what drove this",
+        "biggest influence",
+        "which attribute counted most",
+        "what mattered most here",
+        "main reason for this result",
+        "which factor was strongest",
+        "what was the most important factor",
+        "which thing mattered the most"
+      ],
+      "responses": [
+        "{top_toward_attr}, recorded as {top_toward_value}, contributed {top_toward_contrib} and was the strongest push towards the upper bracket.",
+        "The largest single effect came from {top_toward_attr} at {top_toward_value}, worth {top_toward_contrib} in log odds.",
+        "{top_toward_attr} did the most work here. Its value of {top_toward_value} added {top_toward_contrib}."
+      ]
+    },
+    {
+      "tag": "top_negative_factor",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "What counted against this person?",
+      "handler": "top_negative_factor",
+      "patterns": [
+        "what worked against them",
+        "what lowered the score",
+        "what pushed it down",
+        "negative factors",
+        "what hurt the result",
+        "what counted against the person",
+        "which factor counted against them",
+        "what was working against this person"
+      ],
+      "responses": [
+        "{top_away_attr}, recorded as {top_away_value}, pulled the hardest in the other direction at {top_away_contrib}.",
+        "The strongest downward effect was {top_away_attr} at {top_away_value}, worth {top_away_contrib}.",
+        "{top_away_attr} reduced the score most, contributing {top_away_contrib}."
+      ]
+    },
+    {
+      "tag": "full_breakdown",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "Show every factor",
+      "handler": "full_breakdown",
+      "patterns": [
+        "break it all down",
+        "list all the contributions",
+        "show me everything",
+        "full explanation please",
+        "all the attributes",
+        "show every factor please",
+        "give me the whole breakdown",
+        "list every contribution"
+      ],
+      "responses": [
+        "Here is every attribute and what it contributed:\n\n{breakdown}",
+        "The complete decomposition:\n\n{breakdown}",
+        "All thirteen attributes, largest effect first:\n\n{breakdown}"
+      ]
+    },
+    {
+      "tag": "effect_education",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "Did education make a difference?",
+      "handler": "attribute_effect",
+      "attribute": "education-num",
+      "patterns": [
+        "how much did the degree matter",
+        "does schooling affect this",
+        "impact of qualifications",
+        "did their studies count",
+        "what about their education level",
+        "did education make any difference",
+        "how much does education matter",
+        "effect of their education"
+      ],
+      "responses": [
+        "{attr_name} at {attr_value} contributed {attr_contribution}, pushing {attr_direction} the upper bracket.",
+        "Recorded as {attr_value}, {attr_name} moved the prediction {attr_direction} by {attr_contribution}.",
+        "{attr_contribution} came from {attr_name} being {attr_value}."
+      ]
+    },
+    {
+      "tag": "effect_age",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "How much did age matter?",
+      "handler": "attribute_effect",
+      "attribute": "age",
+      "patterns": [
+        "does being older help",
+        "impact of how old they are",
+        "did their years count",
+        "is age important here",
+        "effect of being that old",
+        "does their age carry weight",
+        "does age make a difference",
+        "how much does their age count",
+        "did age matter for this person"
+      ],
+      "responses": [
+        "{attr_name} of {attr_value} contributed {attr_contribution}, pushing {attr_direction} the upper bracket.",
+        "At {attr_value}, {attr_name} moved things {attr_direction} by {attr_contribution}.",
+        "{attr_contribution} of the total came from {attr_name} being {attr_value}."
+      ]
+    },
+    {
+      "tag": "effect_hours",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "Do the working hours matter?",
+      "handler": "attribute_effect",
+      "attribute": "hours-per-week",
+      "patterns": [
+        "does working longer help",
+        "impact of the weekly hours",
+        "what about full time work",
+        "effect of overtime",
+        "did the workload count",
+        "do the hours matter",
+        "how much do working hours matter",
+        "does hours per week make a difference"
+      ],
+      "responses": [
+        "{attr_name} at {attr_value} contributed {attr_contribution}, pushing {attr_direction} the upper bracket.",
+        "{attr_value} on {attr_name} moved the prediction {attr_direction} by {attr_contribution}.",
+        "{attr_contribution} came from {attr_name} being {attr_value}."
+      ]
+    },
+    {
+      "tag": "effect_occupation",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "How much did the job type matter?",
+      "handler": "attribute_effect",
+      "attribute": "occupation",
+      "patterns": [
+        "does the profession matter",
+        "impact of their line of work",
+        "what about their trade",
+        "effect of the role they do",
+        "did their career count",
+        "how much did the occupation matter",
+        "does the job matter here",
+        "effect of their job type"
+      ],
+      "responses": [
+        "{attr_name} recorded as {attr_value} contributed {attr_contribution}, pushing {attr_direction} the upper bracket.",
+        "Being {attr_value} moved the prediction {attr_direction} by {attr_contribution}.",
+        "{attr_contribution} of the result came from {attr_name} being {attr_value}."
+      ]
+    },
+    {
+      "tag": "effect_marital_status",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "Does marital status affect this?",
+      "handler": "attribute_effect",
+      "attribute": "marital-status",
+      "patterns": [
+        "does being married change it",
+        "impact of their relationship situation",
+        "what about being single",
+        "effect of a spouse",
+        "did marriage count here",
+        "does marital status matter",
+        "how much does being married affect this",
+        "effect of their marital situation"
+      ],
+      "responses": [
+        "{attr_name} recorded as {attr_value} contributed {attr_contribution}, pushing {attr_direction} the upper bracket. This is one of the strongest signals in the dataset and it is worth treating with suspicion, since it correlates heavily with sex.",
+        "Being {attr_value} moved the prediction {attr_direction} by {attr_contribution}. Note that this field carries information about sex as well as about marriage.",
+        "{attr_contribution} came from {attr_name} being {attr_value}. The household fields in this data are entangled with sex, so read that number carefully."
+      ]
+    },
+    {
+      "tag": "effect_capital_gain",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "What about capital gains?",
+      "handler": "attribute_effect",
+      "attribute": "capital-gain",
+      "patterns": [
+        "does investment income matter",
+        "impact of capital",
+        "what about share profits",
+        "effect of gains from assets",
+        "did they have other income",
+        "do capital gains matter",
+        "what about the capital gain field",
+        "how much do capital gains count"
+      ],
+      "responses": [
+        "{attr_name} at {attr_value} contributed {attr_contribution}, pushing {attr_direction} the upper bracket. A value of zero is informative to the model rather than neutral.",
+        "{attr_value} on {attr_name} moved the prediction {attr_direction} by {attr_contribution}. Zero is a meaningful signal here, not an absence of one.",
+        "{attr_contribution} came from {attr_name} being {attr_value}."
+      ]
+    },
+    {
+      "tag": "what_if_change",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "What if one detail were different?",
+      "handler": "what_if_change",
+      "patterns": [
+        "what happens if i change something",
+        "would a different answer change it",
+        "can i test another value",
+        "how sensitive is this",
+        "what if the details were different",
+        "what if one thing were different",
+        "if i changed a detail what happens",
+        "can i try different details"
+      ],
+      "responses": [
+        "Change any field on the assessment tab and score again. The current largest effect is {top_toward_attr} at {top_toward_contrib}, so altering that will move the result most.",
+        "Try it directly: adjust a value and press assess again. {top_toward_attr} is carrying the most weight here, so start there.",
+        "The comparison is easiest done by hand. Right now {top_toward_attr} contributes {top_toward_contrib}, more than anything else, so it is the field to vary first."
+      ]
+    },
+    {
+      "tag": "defaulted_fields",
+      "category": "Why",
+      "show_when": "after_assessment",
+      "display": "Which details were filled in for me?",
+      "handler": "defaulted_fields",
+      "patterns": [
+        "what did you assume",
+        "which fields were blank",
+        "did you guess anything",
+        "what was not supplied",
+        "which values were made up",
+        "which details did you fill in",
+        "what did you fill in for me",
+        "which answers were filled automatically"
+      ],
+      "responses": [
+        "These were not supplied and were filled from the training data: {defaulted_list}. They still contribute to the prediction.",
+        "Filled in on your behalf: {defaulted_list}. Each one affects the result like any answered field.",
+        "{defaulted_list} came from the training median or mode rather than from you."
+      ]
+    },
+    {
+      "tag": "how_explanation_works",
+      "category": "Why",
+      "show_when": "always",
+      "display": "How are these contributions calculated?",
+      "handler": "how_explanation_works",
+      "patterns": [
+        "how do you know what mattered",
+        "where do these numbers come from",
+        "how is the breakdown produced",
+        "is the explanation reliable",
+        "what method explains this",
+        "how are the contributions worked out",
+        "how do you calculate each contribution",
+        "how is the attribution computed"
+      ],
+      "responses": [
+        "The contributions come from TreeSHAP, built into the algorithm itself. They are exact rather than estimated: the contributions plus the model's baseline add up to the raw output, and converting that sum gives back the probability precisely. The unit is log odds, not a percentage.",
+        "This is not a simplified stand-in model guessing at reasons. Each figure is the attribute's exact share of the raw output, and they reconcile to the prediction to within rounding error. They are measured in log odds.",
+        "The algorithm can report exactly how much each attribute moved its own output. Those values sum to the prediction, which is why the breakdown can be checked rather than trusted. Values are in log odds, so a contribution of 0.8 does not mean eighty percent."
+      ]
+    },
+    {
+      "tag": "which_algorithm",
+      "category": "The model",
+      "show_when": "always",
+      "display": "Which algorithm is this?",
+      "handler": "which_algorithm",
+      "patterns": [
+        "what model is running",
+        "what technique do you use",
+        "is this a neural network",
+        "what is under the hood",
+        "which method makes the prediction",
+        "which algorithm is behind this",
+        "what algorithm are you using",
+        "name the algorithm"
+      ],
+      "responses": [
+        "{model_name}, a gradient boosted tree ensemble, trained on {train_rows} census records with {features} prepared features.",
+        "The prediction comes from {model_name} fitted to {train_rows} records. It was chosen after comparing eight algorithms.",
+        "{model_name}. It builds many shallow decision trees in sequence, each correcting the previous ones."
+      ]
+    },
+    {
+      "tag": "how_accurate",
+      "category": "The model",
+      "show_when": "always",
+      "display": "How accurate is it?",
+      "handler": "how_accurate",
+      "patterns": [
+        "how good is this model",
+        "how often is it right",
+        "can i trust the numbers",
+        "what is the error rate",
+        "how well does it perform",
+        "how accurate are the predictions",
+        "what accuracy does it get",
+        "is it accurate"
+      ],
+      "responses": [
+        "{accuracy_pct} accurate on {test_rows} held-out records it never saw during training. It is wrong roughly one time in eight.",
+        "On the held-out file it reaches {accuracy_pct} accuracy with an area under the curve of {roc_auc}. That leaves a substantial error rate.",
+        "{accuracy_pct} on data held back from training. Accuracy alone flatters it, because most people in the data fall below the threshold anyway."
+      ]
+    },
+    {
+      "tag": "precision_and_recall",
+      "category": "The model",
+      "show_when": "always",
+      "display": "What are the precision and recall?",
+      "handler": "precision_and_recall",
+      "patterns": [
+        "what is the recall",
+        "how many does it miss",
+        "false positives and negatives",
+        "f1 score",
+        "does it catch everyone",
+        "what is the precision",
+        "tell me precision and recall figures",
+        "what are the precision numbers"
+      ],
+      "responses": [
+        "Precision {precision_pct} and recall {recall_pct}, giving an F1 of {f1}. It misses a large share of the people who genuinely are above the threshold.",
+        "Recall is {recall_pct}, so roughly a third of upper bracket cases are missed. Precision is {precision_pct} when it does predict the upper bracket.",
+        "F1 of {f1}, from precision {precision_pct} and recall {recall_pct}. The recall figure is the weaker of the two and matters most if missing someone is costly."
+      ]
+    },
+    {
+      "tag": "why_this_algorithm",
+      "category": "The model",
+      "show_when": "always",
+      "display": "Why this algorithm and not another?",
+      "handler": "why_this_algorithm",
+      "patterns": [
+        "why not logistic regression",
+        "why did you pick that one",
+        "what about a neural network instead",
+        "was it the best option",
+        "how was the algorithm chosen",
+        "why this algorithm over another",
+        "why choose this one and not something else",
+        "why that algorithm"
+      ],
+      "responses": [
+        "Eight algorithms were compared on the same split and {model_name} scored highest, so it was deployed. The cost is that a tree ensemble has no coefficients to read, which is why the explanation uses exact attribution instead.",
+        "It won the comparison. A simpler model such as logistic regression would be easier to read directly, but the gap in performance was real and the attribution method recovers the explanation without approximating it.",
+        "{model_name} performed best of the eight tested. The interpretability that a linear model would have given for free is recovered through the contribution breakdown, which is exact rather than an estimate."
+      ]
+    },
+    {
+      "tag": "is_it_calibrated",
+      "category": "The model",
+      "show_when": "always",
+      "display": "Do the probabilities mean anything?",
+      "handler": "is_it_calibrated",
+      "patterns": [
+        "are the percentages real",
+        "is it overconfident",
+        "can i read the score as a chance",
+        "how reliable is the probability",
+        "is the output well behaved",
+        "do the probabilities actually mean anything",
+        "are the probabilities meaningful",
+        "is the probability trustworthy"
+      ],
+      "responses": [
+        "Yes, and it was measured rather than assumed. The Brier score is {brier} and the average gap between predicted and observed rates is {ece}, so a prediction of seventy percent does correspond to roughly seventy percent of such cases falling above the threshold.",
+        "Checked on the validation split: average calibration error {ece}, Brier score {brier}. Boosted models often distort probabilities, and this one does not do so badly enough to affect the bands.",
+        "The reliability curve tracks the diagonal closely, with a Brier score of {brier}. That is why the bands can be built on the probability rather than on the raw ranking."
+      ]
+    },
+    {
+      "tag": "how_thresholds_chosen",
+      "category": "The model",
+      "show_when": "always",
+      "display": "Where did the band boundaries come from?",
+      "handler": "how_thresholds_chosen",
+      "patterns": [
+        "why those cutoffs",
+        "how did you pick the boundaries",
+        "who decided the ranges",
+        "are the limits arbitrary",
+        "how were the bands set",
+        "what sets the boundaries",
+        "how were the band boundaries chosen",
+        "origin of the boundaries"
+      ],
+      "responses": [
+        "{threshold_evidence}",
+        "They were selected from evidence rather than chosen for neatness. {threshold_evidence}",
+        "{threshold_evidence} Wider bands score better but refer more cases, so the choice is a judgement about queue size, not a maximum."
+      ]
+    },
+    {
+      "tag": "data_source",
+      "category": "The data",
+      "show_when": "always",
+      "display": "Where does the data come from?",
+      "handler": "data_source",
+      "patterns": [
+        "what data was this trained on",
+        "where did you get the records",
+        "whose information is this",
+        "what is the source",
+        "which dataset is behind this",
+        "which source supplied the data",
+        "where is the data from",
+        "source of the data"
+      ],
+      "responses": [
+        "The UCI Adult dataset, extracted from the 1994 United States Census. It is public, widely used for teaching, and contains no identifying information.",
+        "It comes from the 1994 US Census by way of the UCI Machine Learning Repository. No real individual is identifiable in it.",
+        "Public census records from the United States in 1994, published by UCI as the Adult dataset."
+      ]
+    },
+    {
+      "tag": "data_age",
+      "category": "The data",
+      "show_when": "always",
+      "display": "How old is the data?",
+      "handler": "data_age",
+      "patterns": [
+        "is this current",
+        "when was it collected",
+        "is the information out of date",
+        "how recent are the records",
+        "does this reflect today",
+        "is the dataset old",
+        "how old are these records",
+        "what year is the data from"
+      ],
+      "responses": [
+        "{limitation_section}",
+        "Not current at all. {limitation_section}",
+        "{limitation_section} This is the single largest problem with taking any prediction here literally."
+      ],
+      "section": "dataset_age"
+    },
+    {
+      "tag": "dataset_size",
+      "category": "The data",
+      "show_when": "always",
+      "display": "How many records were used?",
+      "handler": "dataset_size",
+      "patterns": [
+        "how big is the dataset",
+        "how many people are in it",
+        "number of rows",
+        "sample size",
+        "how much data trained this",
+        "how many records went into training",
+        "how many records are there",
+        "count of records used"
+      ],
+      "responses": [
+        "{train_rows} records for training and {test_rows} held back for testing, kept separate exactly as the dataset publishers split them.",
+        "Training used {train_rows} records. A further {test_rows} were never seen during training and are used to report performance.",
+        "{train_rows} training records and {test_rows} held-out ones, described by {features} prepared features."
+      ]
+    },
+    {
+      "tag": "features_used",
+      "category": "The data",
+      "show_when": "always",
+      "display": "What information does it use?",
+      "handler": "features_used",
+      "patterns": [
+        "what does it look at",
+        "which attributes are used",
+        "what inputs go in",
+        "what does it know about someone",
+        "which variables matter",
+        "what information is fed to the model",
+        "what information goes into the model",
+        "which fields are used"
+      ],
+      "responses": [
+        "Thirteen attributes covering age, education, occupation, employment type, hours worked, household situation, sex, race, country of birth and capital income. These expand to {features} numeric features once categories are encoded.",
+        "Demographic and employment attributes from the census: age, schooling, job, hours, marital and household status, sex, race, origin and capital gains or losses.",
+        "Thirteen census fields in total, becoming {features} features after encoding. One sampling weight column was dropped as it describes the survey rather than the person."
+      ]
+    },
+    {
+      "tag": "is_it_fair",
+      "category": "Limitations",
+      "show_when": "always",
+      "display": "Is this model fair?",
+      "handler": "is_it_fair",
+      "patterns": [
+        "is it biased",
+        "does it discriminate",
+        "is it even handed",
+        "are the outcomes equal",
+        "should i be worried about bias",
+        "is this model fair to everyone",
+        "is the model fair",
+        "how fair is this"
+      ],
+      "responses": [
+        "No. {limitation_section}",
+        "{limitation_section}",
+        "Not on the evidence. {limitation_section}"
+      ],
+      "section": "group_differences"
+    },
+    {
+      "tag": "sex_and_race",
+      "category": "Limitations",
+      "show_when": "always",
+      "display": "Does changing sex change the answer?",
+      "handler": "sex_and_race",
+      "patterns": [
+        "what happens if you swap the gender",
+        "does being a woman lower it",
+        "effect of race on the outcome",
+        "would a man score higher",
+        "test the protected attributes",
+        "does changing the sex change the result",
+        "if you change sex does the answer change",
+        "does sex affect the answer"
+      ],
+      "responses": [
+        "{limitation_section}",
+        "It does, measurably. {limitation_section}",
+        "{limitation_section} That is a property of the model, not of the person being assessed."
+      ],
+      "section": "counterfactual"
+    },
+    {
+      "tag": "proxy_variables",
+      "category": "Limitations",
+      "show_when": "always",
+      "display": "Would deleting sex and race fix it?",
+      "handler": "proxy_variables",
+      "patterns": [
+        "why not just remove those columns",
+        "can you train without them",
+        "what is a proxy variable",
+        "does hiding the attribute help",
+        "surely dropping them solves it",
+        "would deleting sex and race fix the bias",
+        "if you delete race and sex is it fixed",
+        "does removing those fields fix it"
+      ],
+      "responses": [
+        "{limitation_section}",
+        "It sounds like it should. {limitation_section}",
+        "{limitation_section} This is the central finding of the project."
+      ],
+      "section": "proxies"
+    },
+    {
+      "tag": "real_world_use",
+      "category": "Limitations",
+      "show_when": "always",
+      "display": "Could this be used for a real decision?",
+      "handler": "real_world_use",
+      "patterns": [
+        "can i use this for a mortgage",
+        "is this allowed for lending",
+        "could a bank run this",
+        "is it legal to screen people with it",
+        "can i apply this to a real applicant",
+        "would a real decision be allowed",
+        "can this make real decisions",
+        "is it usable in the real world"
+      ],
+      "responses": [
+        "No. {limitation_section}",
+        "It must not be. {limitation_section}",
+        "{limitation_section}"
+      ],
+      "section": "legal"
+    },
+    {
+      "tag": "limitations_overview",
+      "category": "Limitations",
+      "show_when": "always",
+      "display": "What are the main limitations?",
+      "handler": "limitations_overview",
+      "patterns": [
+        "what are the weaknesses",
+        "what should i be careful about",
+        "where does this fall down",
+        "what are the caveats",
+        "what is wrong with it",
+        "what limitations should i know",
+        "what are the limitations",
+        "list the limitations"
+      ],
+      "responses": [
+        "{limitations_summary} The limitations tab sets out all of it in detail.",
+        "In short: {limitations_summary}",
+        "{limitations_summary}"
+      ]
+    }
+  ]
+}
