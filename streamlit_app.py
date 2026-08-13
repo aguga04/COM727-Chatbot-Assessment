@@ -10,12 +10,15 @@ time the user touches anything.
 Sections marked below are filled in by later phases.
 """
 
+import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
 
 from src import config
 from src.chatbot import limitations
-from src.chatbot.engine import question_buttons
+from src.chatbot.engine import READABLE, question_buttons
 from src.decision import decide, load_thresholds
+from src.explain import explain
 from src.nlp import ensure_corpora
 from src.predict import load_artefacts, score_person, version_report
 
@@ -201,12 +204,125 @@ def assessment_tab():
     show_outcome(st.session_state.assessment)
 
 
+TOWARDS_COLOUR = "#2E7D5B"
+AWAY_COLOUR = "#B5533C"
+
+
+def format_attribute_value(value):
+    """Return an attribute value as text.
+
+    The column mixes whole numbers with category names, which cannot be handed
+    to the table renderer as it stands, and a whole number should not gain a
+    decimal point on the way to the screen.
+    """
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        number = float(value)
+        return str(int(number)) if number.is_integer() else f"{number:.2f}"
+    return str(value)
+
+
+def contribution_chart(table):
+    """Draw the per attribute contributions as a diverging horizontal bar chart."""
+    ordered = table.iloc[::-1]
+
+    labels = [READABLE.get(a, a) for a in ordered["attribute"]]
+    values = ordered["contribution"].tolist()
+    colours = [TOWARDS_COLOUR if v >= 0 else AWAY_COLOUR for v in values]
+    hover = [
+        f"{label}: {format_attribute_value(value)}"
+        f"<br>contribution {contribution:+.3f} log odds"
+        for label, value, contribution in zip(labels, ordered["value"], values)
+    ]
+
+    figure = go.Figure(go.Bar(
+        x=values, y=labels, orientation="h",
+        marker_color=colours, hovertext=hover, hoverinfo="text",
+        text=[f"{v:+.3f}" for v in values], textposition="outside", cliponaxis=False,
+    ))
+
+    span = max(abs(min(values)), abs(max(values))) * 1.35
+    figure.update_layout(
+        height=32 * len(labels) + 90,
+        margin=dict(l=10, r=10, t=10, b=40),
+        xaxis=dict(title="Contribution in log odds", range=[-span, span],
+                   zeroline=True, zerolinewidth=1, zerolinecolor="#666666"),
+        yaxis=dict(title=None),
+        plot_bgcolor="#FFFFFF",
+        showlegend=False,
+    )
+    return figure
+
+
+def arithmetic_block(explanation, assessment):
+    """Show that the contributions reconstruct the model output exactly."""
+    total = float(explanation["table"]["contribution"].sum())
+
+    st.markdown(
+        f"""
+| Step | Value |
+| --- | ---: |
+| Model baseline before any attribute is considered | {explanation['bias']:+.4f} |
+| Sum of the thirteen contributions above | {total:+.4f} |
+| Log odds for this person | {explanation['log_odds']:+.4f} |
+| Probability after converting the log odds | {explanation['probability']:.4f} |
+| Probability reported by the model itself | {assessment['probability']:.4f} |
+"""
+    )
+    st.caption(
+        f"The two probabilities agree to within {explanation['reconstruction_error']:.1e}. "
+        "The attribution is exact rather than an estimate, which is why it can be "
+        "checked rather than trusted."
+    )
+
+
 def explanation_tab():
     """Show the per attribute contribution breakdown."""
     if st.session_state.assessment is None:
-        st.info("Assess someone first and the breakdown will appear here.")
+        st.info("Assess someone on the first tab and the breakdown will appear here.")
         return
-    st.info("The contribution chart is added in Phase 7.3.")
+
+    assessment = st.session_state.assessment
+    explanation = explain(assessment)
+    table = explanation["table"]
+
+    st.subheader("What drove this prediction")
+    st.caption(
+        "Each bar is one attribute's exact share of the model's output, measured in "
+        "log odds. Green pushes towards the upper bracket, red pushes away. A "
+        "contribution of +0.8 does not mean eighty percent and does not mean any "
+        "sum of money."
+    )
+
+    towards = table[table["contribution"] > 0]
+    away = table[table["contribution"] < 0]
+    columns = st.columns(2)
+    if not towards.empty:
+        row = towards.iloc[0]
+        columns[0].metric(
+            "Strongest push towards",
+            READABLE.get(row["attribute"], row["attribute"]),
+            f"{row['contribution']:+.3f}")
+    if not away.empty:
+        row = away.iloc[0]
+        columns[1].metric(
+            "Strongest push away",
+            READABLE.get(row["attribute"], row["attribute"]),
+            f"{row['contribution']:+.3f}")
+
+    st.plotly_chart(contribution_chart(table), width="stretch")
+
+    with st.expander("How this adds up"):
+        arithmetic_block(explanation, assessment)
+
+    with st.expander("Every attribute as a table"):
+        display = table.copy()
+        display["attribute"] = [READABLE.get(a, a) for a in display["attribute"]]
+        display["value"] = display["value"].map(format_attribute_value)
+        display["contribution"] = display["contribution"].map(lambda v: f"{v:+.3f}")
+        display = display.rename(columns={
+            "attribute": "Attribute", "value": "Value",
+            "contribution": "Contribution (log odds)", "direction": "Direction"})
+        st.dataframe(display, width="stretch", hide_index=True)
 
 
 def conversation_tab():
