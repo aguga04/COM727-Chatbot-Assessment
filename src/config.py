@@ -62,3 +62,38 @@ EDUCATION_NUM = {
     "Prof-school": 15,
     "Doctorate": 16,
 }
+
+# Ranges accepted by the assessment form, taken from the training data so that
+# no one can enter a value the model has never seen. Verify with:
+#   train[NUMERIC_COLS].agg(["min", "max"])
+NUMERIC_RANGES = {
+    "age": (17, 90),
+    "hours-per-week": (1, 99),
+    "capital-gain": (0, 99999),
+    "capital-loss": (0, 4356),
+}
+
+# Fields the form asks for directly, and those tucked into the optional
+# section. Years of education is absent from both because it is derived from
+# the qualification rather than asked for.
+PRIMARY_FIELDS = [
+    "age", "education", "occupation", "workclass",
+    "hours-per-week", "marital-status", "relationship", "sex",
+]
+
+OPTIONAL_FIELDS = ["capital-gain", "capital-loss", "race", "native-country"]
+
+FIELD_LABELS = {
+    "age": "Age",
+    "education": "Highest qualification",
+    "occupation": "Occupation",
+    "workclass": "Employer type",
+    "hours-per-week": "Hours worked per week",
+    "marital-status": "Marital status",
+    "relationship": "Household role",
+    "sex": "Sex",
+    "capital-gain": "Capital gains",
+    "capital-loss": "Capital losses",
+    "race": "Race",
+    "native-country": "Country of birth",
+}
