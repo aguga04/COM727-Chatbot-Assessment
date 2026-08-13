@@ -10,14 +10,17 @@ time the user touches anything.
 Sections marked below are filled in by later phases.
 """
 
+import json
+
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from src import config
 from src.chatbot import limitations
 from src.chatbot.engine import READABLE, question_buttons, respond
-from src.decision import decide, load_thresholds
+from src.decision import band_evidence, decide, evidence_sentence, load_thresholds
 from src.explain import explain
 from src.nlp import ensure_corpora
 from src.predict import load_artefacts, score_person, version_report
@@ -410,11 +413,160 @@ def conversation_tab():
     question_panel(grouped, ready)
 
 
+@st.cache_data(show_spinner=False)
+def load_results():
+    """Read the generated result files the interface reports from."""
+    comparison = pd.read_csv(config.MODELS / "val_vs_test_all_models.csv")
+
+    with open(config.MODELS / "intent_metrics.json") as handle:
+        intent_metrics = json.load(handle)
+
+    with open(config.MODELS / "fairness_report.json") as handle:
+        fairness = json.load(handle)
+
+    return comparison, intent_metrics, fairness
+
+
+def algorithm_comparison(comparison, metadata):
+    """Show the eight way comparison and the reason one was deployed."""
+    st.subheader("Algorithm comparison")
+    st.caption(
+        "Eight algorithms were fitted on the same training split and evaluated on "
+        "the same validation split, then on the held-out test file the models never "
+        "saw. The deployed model is the strongest performer, not the most readable one."
+    )
+
+    ranked = comparison.sort_values("F1_val", ascending=False).copy()
+    deployed = metadata["model"].replace("Classifier", "")
+
+    display = ranked.rename(columns={
+        "Model": "Algorithm",
+        "Accuracy_val": "Accuracy (validation)", "F1_val": "F1 (validation)",
+        "ROC_AUC_val": "ROC-AUC (validation)",
+        "Accuracy_test": "Accuracy (held out)", "F1_test": "F1 (held out)",
+        "ROC_AUC_test": "ROC-AUC (held out)"})
+
+    st.dataframe(
+        display.style.format(precision=4).apply(
+            lambda row: ["background-color: #E8F2EA" if deployed in str(row["Algorithm"])
+                         else "" for _ in row], axis=1),
+        width="stretch", hide_index=True)
+
+    best = ranked.iloc[0]
+    runner_up = ranked.iloc[1]
+    st.caption(
+        f"{best['Model']} leads on validation F1 by "
+        f"{best['F1_val'] - runner_up['F1_val']:.4f} over {runner_up['Model']}, and "
+        f"holds that lead on the held-out file. A tree ensemble has no coefficients "
+        "to read, so the interpretability a linear model would have given for free is "
+        "recovered through exact attribution instead."
+    )
+
+
+def decision_band_summary():
+    """Explain where the band boundaries came from and how well calibrated they are."""
+    evidence = band_evidence()
+
+    st.subheader("Decision bands")
+    st.write(evidence_sentence())
+
+    columns = st.columns(4)
+    columns[0].metric("Referred to a person", f"{evidence['referral_rate']:.1%}")
+    columns[1].metric("Accuracy when automated", f"{evidence['automated_accuracy']:.1%}",
+                      f"{evidence['accuracy_gain']:+.1%}")
+    columns[2].metric("Brier score", f"{evidence['brier_score']:.4f}")
+    columns[3].metric("Calibration error", f"{evidence['expected_calibration_error']:.4f}")
+    st.caption(
+        "A low calibration error means a predicted probability can be read as a "
+        "probability rather than only as a ranking, which is what allows the bands "
+        "to be defined on it at all."
+    )
+
+
+def conversational_summary(intent_metrics):
+    """Report the second model, which is evaluated separately from the first."""
+    st.subheader("The conversational model")
+    st.caption(
+        "A separate Multinomial Naive Bayes classifier decides what a question is "
+        "asking before the income model is consulted. It is trained on hand written "
+        "example phrasings and evaluated on its own terms."
+    )
+
+    columns = st.columns(4)
+    columns[0].metric("Intents", intent_metrics["intents"])
+    columns[1].metric("Training phrasings", intent_metrics["patterns"])
+    columns[2].metric("Button accuracy", f"{intent_metrics['display_accuracy']:.0%}")
+    columns[3].metric("Unseen phrasing accuracy",
+                      f"{intent_metrics['out_of_fold_accuracy']:.0%}")
+
+    st.caption(
+        f"The two accuracy figures measure different things and both are reported. "
+        f"Button accuracy covers the {intent_metrics['intents']} question wordings the "
+        "interface actually produces, none of which appeared in training. Unseen "
+        "phrasing accuracy is cross validated across all "
+        f"{intent_metrics['patterns']} training examples and is far lower, because the "
+        "intents are numerous and closely related. Free text input is not offered, "
+        "which is one reason why."
+    )
+
+    with st.expander("Per intent performance"):
+        per_intent = pd.DataFrame(intent_metrics["per_intent"])
+        st.dataframe(per_intent.style.format(precision=3),
+                     width="stretch", hide_index=True)
+
+
+def fairness_summary(fairness):
+    """Show the audit findings that the limitations rest on."""
+    rates = {r["group"]: r for r in fairness["group_rates"]["by_sex"]}
+    flip = fairness["counterfactual_sex_only"]
+    removal = fairness["attribute_removal"]
+    proxy = fairness["proxy_recovery"]
+
+    st.subheader("Fairness audit")
+
+    columns = st.columns(3)
+    columns[0].metric(
+        "Predicted upper bracket, men against women",
+        f"{rates['Male']['selection_rate']:.1%} / {rates['Female']['selection_rate']:.1%}")
+    columns[1].metric(
+        "Predictions changed by reversing sex alone",
+        f"{flip['predictions_changed']:,}",
+        f"{flip['share_changed']:.2%} of the held-out file")
+    columns[2].metric(
+        "Sex recovered from the other columns",
+        f"{proxy['household_role_present']['accuracy']:.1%}",
+        f"baseline {proxy['majority_class_baseline']:.1%}")
+
+    gap_with = removal["with_protected_attributes"]["selection_rate_gap"]
+    gap_without = removal["without_protected_attributes"]["selection_rate_gap"]
+    st.caption(
+        f"Retraining without sex, race and country of birth moves the gap in selection "
+        f"rates from {gap_with:.3f} to {gap_without:.3f}, closing about "
+        f"{removal['gap_closed'] / gap_with:.0%} of it, while accuracy barely moves. "
+        "Other columns carry the same information, so not collecting an attribute is "
+        "not a defence against discriminating on it."
+    )
+
+
 def model_tab():
     """Report how the model performs and where it should not be trusted."""
-    st.info("The comparison table is added in Phase 7.5.")
+    comparison, intent_metrics, fairness = load_results()
+    metadata = load_artefacts()["metadata"]
+
+    algorithm_comparison(comparison, metadata)
+    st.divider()
+    decision_band_summary()
+    st.divider()
+    conversational_summary(intent_metrics)
+    st.divider()
+    fairness_summary(fairness)
+    st.divider()
 
     st.subheader("Limitations")
+    st.caption(
+        "Every figure on this page is read from files the training and audit scripts "
+        "generate. Retraining the model changes what this page says."
+    )
     for section in limitations.panel_text():
         with st.expander(section["heading"]):
             st.write(section["body"])
