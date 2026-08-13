@@ -66,6 +66,7 @@ def ensure_corpora():
 
 @lru_cache(maxsize=1)
 def _lemmatiser():
+    """Return the shared lemmatiser, downloading its corpora on first use."""
     ensure_corpora()
     return WordNetLemmatizer()
 

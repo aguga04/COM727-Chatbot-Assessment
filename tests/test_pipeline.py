@@ -40,21 +40,25 @@ BASE_PERSON = {
 
 @pytest.fixture(scope="session")
 def raw():
+    """The training and held-out files, read once for the whole session."""
     return load_raw()
 
 
 @pytest.fixture(scope="session")
 def artefacts():
+    """The trained booster, the preprocessing schema and the metadata."""
     return load_artefacts()
 
 
 @pytest.fixture(scope="session")
 def assessment():
+    """One scored person, reused across the inference and explanation checks."""
     return score_person(BASE_PERSON)
 
 
 @pytest.fixture(scope="session")
 def intents():
+    """The authored intent definitions."""
     return load_intents()
 
 
@@ -126,6 +130,7 @@ def test_defaults_cover_every_raw_attribute(raw):
 
 
 def _one_row(artefacts, overrides=None):
+    """Build a single raw record from the base person, with optional changes."""
     from src.data import build_person
     answers = dict(BASE_PERSON)
     answers.update(overrides or {})
