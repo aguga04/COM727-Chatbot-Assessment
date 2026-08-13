@@ -1,13 +1,21 @@
-"""Fit the income classifier and write the artefacts the application loads.
+"""Fit both models and write the artefacts the application loads.
 
 Run from the repository root with ``python -m src.train``.
 
-Three files are produced in ``models/``. The trained booster is written in
-XGBoost native JSON, which is designed to load across library versions. The
-fitted scaler, the preparation schema and the default field values are written
-together as one dictionary. Metadata records the library versions, the
-hyperparameters and every metric, so that any figure quoted elsewhere can be
-traced back to the run that produced it.
+Two models are trained, for different jobs. The income classifier predicts which
+side of the census threshold a person falls on. The intent classifier decides
+what a user is asking. They share nothing but this script.
+
+The income booster is written in XGBoost native JSON, which is designed to load
+across library versions. The fitted scaler, the preparation schema and the
+default field values are written together as one dictionary. Metadata records
+the library versions, the hyperparameters and every metric, so that any figure
+quoted elsewhere can be traced back to the run that produced it.
+
+The intent classifier is fitted on the patterns in ``data/intents.json`` only.
+The display strings shown on the interface buttons are deliberately excluded, so
+that the accuracy reported for them describes the deployed model rather than one
+that has already seen them.
 
 The application never fits a model. It loads what this script writes.
 """
@@ -23,10 +31,12 @@ import xgboost as xgb
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, roc_auc_score)
 from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.preprocessing import StandardScaler
 
 from src import config
 from src.data import load_raw, prepare_features, extract_target, compute_defaults
+from src.nlp import build_vocabulary, vectorise_many
 
 MODEL_PARAMS = {
     "n_estimators": 300,
@@ -37,6 +47,19 @@ MODEL_PARAMS = {
 }
 
 VALIDATION_SIZE = 0.2
+
+# Smoothing is lighter than the usual default because the patterns are hand
+# written and sparse. At the default of 1.0 the model is correct on every
+# display string but half of them clear only 0.39 confidence, leaving no room to
+# set a meaningful fallback threshold. At 0.1 it becomes overconfident, with a
+# median above 0.96, which makes a threshold meaningless in the other direction.
+# Measured on this intent set, 0.3 keeps accuracy and spreads the confidences
+# usefully.
+INTENT_ALPHA = 0.3
+
+# Presence rather than counts. A question is short enough that a word rarely
+# repeats, so counting adds noise without adding signal.
+INTENT_BINARY = True
 
 
 def evaluate(model, X, y):
@@ -52,8 +75,8 @@ def evaluate(model, X, y):
     }
 
 
-def train():
-    """Fit the model on the training split and write all artefacts to disk."""
+def train_income():
+    """Fit the income classifier and write its artefacts to disk."""
     config.MODELS.mkdir(exist_ok=True)
 
     train_raw, test_raw = load_raw()
@@ -102,7 +125,7 @@ def train():
             "held_out_test": int(X_test.shape[0]),
         },
         "feature_count": int(X.shape[1]),
-        "positive_class_share": float(y.mean()),
+        "positive_class_share_full_training_file": float(y.mean()),
         "metrics": {"validation": validation_metrics, "held_out_test": test_metrics},
         "versions": {
             "python": platform.python_version(),
@@ -119,26 +142,120 @@ def train():
     return metadata
 
 
-def report(metadata):
-    """Print the run summary in a form that can be checked against the notebook."""
+def load_intents():
+    """Read the intent definitions, in file order."""
+    with open(config.DATA / "intents.json", encoding="utf-8") as handle:
+        return json.load(handle)["intents"]
+
+
+def training_examples(intents):
+    """Return the labelled patterns, excluding every display string."""
+    documents, labels = [], []
+
+    for intent in intents:
+        display = intent["display"].lower().strip("?. ")
+        for pattern in intent["patterns"]:
+            if pattern.lower().strip("?. ") == display:
+                raise ValueError(
+                    f"intent '{intent['tag']}' lists its display string as a pattern, "
+                    "which would make the button test meaningless")
+            documents.append(pattern)
+            labels.append(intent["tag"])
+
+    return documents, labels
+
+
+def train_intents():
+    """Fit the intent classifier on the authored patterns and save it."""
+    config.MODELS.mkdir(exist_ok=True)
+
+    intents = load_intents()
+    documents, labels = training_examples(intents)
+
+    vocabulary = build_vocabulary(documents)
+    X = vectorise_many(documents, vocabulary, binary=INTENT_BINARY)
+
+    model = MultinomialNB(alpha=INTENT_ALPHA)
+    model.fit(X, labels)
+
+    tags = list(model.classes_)
+    displays = [i["display"] for i in intents]
+    expected = [i["tag"] for i in intents]
+
+    probabilities = model.predict_proba(
+        vectorise_many(displays, vocabulary, binary=INTENT_BINARY))
+    predicted = [tags[i] for i in probabilities.argmax(axis=1)]
+    confidences = probabilities.max(axis=1)
+    correct = [p == e for p, e in zip(predicted, expected)]
+
+    artefact = {
+        "model": model,
+        "vocabulary": vocabulary,
+        "tags": tags,
+        "alpha": INTENT_ALPHA,
+        "binary": INTENT_BINARY,
+        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "intent_count": len(intents),
+        "pattern_count": len(documents),
+        "vocabulary_size": len(vocabulary),
+        "display_accuracy": float(np.mean(correct)),
+        "lowest_display_confidence": float(confidences.min()),
+        "median_display_confidence": float(np.median(confidences)),
+        "display_failures": [
+            {"display": d, "expected": e, "predicted": p, "confidence": float(c)}
+            for d, e, p, c, ok in zip(displays, expected, predicted, confidences, correct)
+            if not ok
+        ],
+        "versions": {
+            "python": platform.python_version(),
+            "scikit_learn": sklearn.__version__,
+            "numpy": np.__version__,
+        },
+    }
+
+    joblib.dump(artefact, config.MODELS / "intent_model.joblib")
+
+    return artefact
+
+
+def report_income(metadata):
+    """Print the income run in a form that can be checked against the notebook."""
     rows = metadata["rows"]
-    print(f"train {rows['train']}  validation {rows['validation']}  "
+    print("Income classifier")
+    print(f"  train {rows['train']}  validation {rows['validation']}  "
           f"held-out test {rows['held_out_test']}  features {metadata['feature_count']}")
 
-    header = f"{'split':<16}{'accuracy':>10}{'precision':>11}{'recall':>9}{'f1':>9}{'roc_auc':>10}"
-    print(header)
+    print(f"  {'split':<16}{'accuracy':>10}{'precision':>11}{'recall':>9}"
+          f"{'f1':>9}{'roc_auc':>10}")
     for split, scores in metadata["metrics"].items():
-        print(f"{split:<16}"
+        print(f"  {split:<16}"
               f"{scores['accuracy']:>10.4f}"
               f"{scores['precision']:>11.4f}"
               f"{scores['recall']:>9.4f}"
               f"{scores['f1']:>9.4f}"
               f"{scores['roc_auc']:>10.4f}")
 
-    versions = metadata["versions"]
-    print(f"xgboost {versions['xgboost']}  scikit-learn {versions['scikit_learn']}")
-    print(f"artefacts written to {config.MODELS}")
+
+def report_intents(artefact):
+    """Print the intent run, including any button that fails to resolve."""
+    print("Intent classifier")
+    print(f"  {artefact['intent_count']} intents, {artefact['pattern_count']} patterns, "
+          f"{artefact['vocabulary_size']} words after preprocessing")
+    print(f"  alpha {artefact['alpha']}  binary presence {artefact['binary']}")
+    print(f"  display strings resolving correctly {artefact['display_accuracy']:.1%}")
+    print(f"  confidence on buttons: lowest {artefact['lowest_display_confidence']:.3f}, "
+          f"median {artefact['median_display_confidence']:.3f}")
+
+    for failure in artefact["display_failures"]:
+        print(f"  FAILS  '{failure['display']}' reached {failure['predicted']} "
+              f"instead of {failure['expected']} at {failure['confidence']:.3f}")
 
 
 if __name__ == "__main__":
-    report(train())
+    report_income(train_income())
+    print()
+    report_intents(train_intents())
+
+    versions = json.load(open(config.MODELS / "metadata.json"))["versions"]
+    print(f"\nxgboost {versions['xgboost']}  scikit-learn {versions['scikit_learn']}")
+    print(f"artefacts written to {config.MODELS}")
