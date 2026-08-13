@@ -16,7 +16,7 @@ import streamlit as st
 
 from src import config
 from src.chatbot import limitations
-from src.chatbot.engine import READABLE, question_buttons
+from src.chatbot.engine import READABLE, question_buttons, respond
 from src.decision import decide, load_thresholds
 from src.explain import explain
 from src.nlp import ensure_corpora
@@ -325,17 +325,89 @@ def explanation_tab():
         st.dataframe(display, width="stretch", hide_index=True)
 
 
+CATEGORY_ORDER = ["This prediction", "Why", "The model", "The data",
+                  "Limitations", "Conversation"]
+
+
+def ask(question):
+    """Send a question through the classifier and record both sides of the exchange."""
+    outcome = respond(question, assessment=st.session_state.assessment)
+
+    st.session_state.messages.append({"role": "user", "text": question})
+    st.session_state.messages.append({
+        "role": "assistant",
+        "text": outcome["response"],
+        "tag": outcome["tag"],
+        "confidence": outcome["confidence"],
+        "threshold": outcome["threshold"],
+        "used_fallback": outcome["used_fallback"],
+    })
+
+
+def replay_history():
+    """Draw the conversation so far, with the classifier's working shown."""
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.write(message["text"])
+
+            if message["role"] == "assistant":
+                label = (
+                    f"Fallback, confidence {message['confidence']:.3f} "
+                    f"below the {message['threshold']:.2f} threshold"
+                    if message["used_fallback"]
+                    else f"Recognised as {message['tag']}, "
+                         f"confidence {message['confidence']:.3f}"
+                )
+                with st.expander(label):
+                    st.caption(
+                        "The question was classified by a Multinomial Naive Bayes "
+                        "model trained on hand written examples. Anything below "
+                        f"{message['threshold']:.2f} confidence returns a fallback "
+                        "instead of an answer."
+                    )
+
+
+def question_panel(grouped, ready):
+    """Offer the available questions, grouped by topic."""
+    for category in CATEGORY_ORDER:
+        questions = grouped.get(category)
+        if not questions:
+            continue
+
+        expanded = category == ("This prediction" if ready else "The model")
+        with st.expander(f"{category}  ({len(questions)})", expanded=expanded):
+            columns = st.columns(2)
+            for position, question in enumerate(questions):
+                if columns[position % 2].button(
+                        question["display"], key=f"ask_{question['tag']}",
+                        width="stretch"):
+                    ask(question["display"])
+                    st.rerun()
+
+
 def conversation_tab():
     """Ask questions about the assessment, the model and the data."""
     ready = st.session_state.assessment is not None
     grouped = question_buttons(ready)
-    available = sum(len(v) for v in grouped.values())
+    available = sum(len(questions) for questions in grouped.values())
 
+    st.subheader("Ask about this model")
     st.caption(
         f"{available} questions available"
-        + ("" if ready else ", and more once someone has been assessed")
+        + ("." if ready else ", and more once someone has been assessed.")
+        + " Selecting one sends that sentence to the intent classifier exactly as "
+        "typed input would arrive. The wording on each button was held out of "
+        "training, so recognising it is a genuine classification rather than a lookup."
     )
-    st.info("The conversation is wired up in Phase 7.4.")
+
+    if st.session_state.messages:
+        replay_history()
+        if st.button("Clear conversation"):
+            st.session_state.messages = []
+            st.rerun()
+        st.divider()
+
+    question_panel(grouped, ready)
 
 
 def model_tab():
