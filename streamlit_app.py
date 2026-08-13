@@ -26,11 +26,27 @@ from src.nlp import ensure_corpora
 from src.predict import load_artefacts, score_person, version_report
 
 st.set_page_config(
-    page_title="Income bracket decision support",
-    page_icon="◱",
+    page_title="Nexus Income Bracket Chatbot",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+# The interface uses a single light palette. Text colour is never set inline, so
+# every label follows the theme Streamlit is rendering and cannot end up dark on
+# dark or pale on white.
+COLOURS = {
+    "surface": "#F1F4F7",
+    "accent": "#1B3A5C",
+    "muted": "#5A6B7C",
+    "towards": "#2E7D5B",
+    "away": "#B5533C",
+    "suit": "#1B3A5C",
+    "body": "#C8D2DB",
+    "visor": "#0E1F30",
+    "coin": "#D9A441",
+    "background": "#FFFFFF",
+}
 
 
 @st.cache_resource(show_spinner="Loading the trained models")
@@ -61,22 +77,93 @@ def initialise_state():
     st.session_state.setdefault("untouched_fields", [])
 
 
+def robot():
+    """Return the mascot as an SVG string.
+
+    Drawn rather than loaded so it needs no asset file and scales cleanly. It is
+    handed to ``st.image`` rather than to ``st.markdown``: markdown strips svg
+    elements during sanitising, which leaves only the loose text inside them.
+    Motion is dropped for anyone who has asked their system to reduce it.
+    """
+    colours = COLOURS
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <style>
+    @keyframes nexus-bob {{ 0%,100% {{ transform: translateY(0); }}
+                            50% {{ transform: translateY(-3px); }} }}
+    @keyframes nexus-blink {{ 0%,92%,100% {{ transform: scaleY(1); }}
+                              96% {{ transform: scaleY(0.08); }} }}
+    @keyframes nexus-spin {{ 0%,100% {{ transform: scaleX(1); }}
+                             50% {{ transform: scaleX(0.25); }} }}
+    @keyframes nexus-pulse {{ 0%,100% {{ opacity: 0.45; }} 50% {{ opacity: 1; }} }}
+    .nx-body {{ animation: nexus-bob 4s ease-in-out infinite; transform-origin: 60px 60px; }}
+    .nx-eye  {{ animation: nexus-blink 5.5s ease-in-out infinite; transform-origin: center; }}
+    .nx-coin {{ animation: nexus-spin 3.2s ease-in-out infinite; transform-origin: 96px 74px; }}
+    .nx-tip  {{ animation: nexus-pulse 2.4s ease-in-out infinite; }}
+    @media (prefers-reduced-motion: reduce) {{
+      .nx-body, .nx-eye, .nx-coin, .nx-tip {{ animation: none; }}
+    }}
+  </style>
+  <g class="nx-body">
+    <line x1="60" y1="22" x2="60" y2="12" stroke="{colours['body']}" stroke-width="3"/>
+    <circle class="nx-tip" cx="60" cy="9" r="4" fill="{colours['coin']}"/>
+    <rect x="34" y="22" width="52" height="38" rx="12" fill="{colours['body']}"/>
+    <rect x="41" y="32" width="38" height="19" rx="8" fill="{colours['visor']}"/>
+    <circle class="nx-eye" cx="52" cy="41" r="3.6" fill="{colours['coin']}"/>
+    <circle class="nx-eye" cx="68" cy="41" r="3.6" fill="{colours['coin']}"/>
+    <path d="M60 62 L44 70 L44 106 L76 106 L76 70 Z" fill="{colours['suit']}"/>
+    <path d="M60 62 L52 68 L60 84 L68 68 Z" fill="{colours['background']}"/>
+    <path d="M60 66 L56 71 L60 79 L64 71 Z" fill="{colours['coin']}"/>
+    <rect x="30" y="72" width="12" height="30" rx="6" fill="{colours['suit']}"/>
+    <rect x="78" y="72" width="12" height="30" rx="6" fill="{colours['suit']}"/>
+    <g class="nx-coin">
+      <circle cx="96" cy="74" r="11" fill="{colours['coin']}"/>
+      <text x="96" y="79" font-size="13" font-weight="700" text-anchor="middle"
+            fill="{colours['visor']}">$</text>
+    </g>
+  </g>
+</svg>
+"""
+
+
 def header(metadata):
-    """Draw the title and the standing caveat."""
-    st.title("Income bracket decision support")
+    """Draw the mascot, the title and the headline figures."""
+    left, right = st.columns([1, 9], vertical_alignment="center")
+
+    with left:
+        st.image(robot(), width=110)
+
+    with right:
+        st.markdown(
+            "<div style='font-size:2.1rem;font-weight:700;line-height:1.1;"
+            "color:inherit'>Team Nexus</div>"
+            "<div style='font-size:1.2rem;font-weight:500;color:inherit;"
+            "opacity:0.85'>Income Bracket Chatbot</div>",
+            unsafe_allow_html=True)
+
     st.caption(
-        "Predicts whether a person falls above or below the 1994 US census income "
-        "threshold, explains which attributes drove that prediction, and routes "
-        "uncertain cases to a human assessor. Built for COM727. Not a tool for "
-        "deciding anything about a real person."
+        "A decision support helper for income bracket assessment."
+        "It explains every outcome in plain language, refers uncertain cases to a person,"
+        "and answers questions about its own limits."
     )
 
-    columns = st.columns(4)
     held_out = metadata["metrics"]["held_out_test"]
-    columns[0].metric("Held-out accuracy", f"{held_out['accuracy']:.1%}")
-    columns[1].metric("Recall", f"{held_out['recall']:.1%}")
-    columns[2].metric("Records held back", f"{metadata['rows']['held_out_test']:,}")
-    columns[3].metric("Attributes used", metadata["feature_count"])
+    columns = st.columns(4)
+    columns[0].metric(
+        "Held-out accuracy", f"{held_out['accuracy']:.1%}",
+        help="Of every 100 people the model has never seen, it puts this many on the "
+             "correct side of the income threshold.")
+    columns[1].metric(
+        "Recall", f"{held_out['recall']:.1%}",
+        help="Of the people who genuinely are above the threshold, this share is "
+             "correctly identified. The rest are missed.")
+    columns[2].metric(
+        "Records held back", f"{metadata['rows']['held_out_test']:,}",
+        help="Census records kept aside during training and used only for scoring, "
+             "so the figures above are not flattered by memorisation.")
+    columns[3].metric(
+        "Attributes used", metadata["feature_count"],
+        help="Thirteen real world attributes become this many numeric columns once "
+             "categories such as occupation are split out.")
 
 
 def show_warnings(warnings):
@@ -154,7 +241,7 @@ def show_outcome(assessment):
 
     st.markdown(
         f"<div style='border-left:6px solid {colour};padding:0.6rem 1rem;"
-        f"background:#F1F4F7;border-radius:4px'>"
+        f"background:{COLOURS['surface']};border-radius:4px'>"
         f"<div style='font-size:1.35rem;font-weight:600;color:{colour}'>{heading}</div>"
         f"<div style='margin-top:0.3rem'>{outcome['action']}</div></div>",
         unsafe_allow_html=True,
@@ -162,8 +249,11 @@ def show_outcome(assessment):
 
     st.write("")
     columns = st.columns([2, 3])
-    columns[0].metric("Probability of the upper bracket",
-                      f"{assessment['probability']:.1%}")
+    columns[0].metric(
+        "Probability of the upper bracket",
+        f"{assessment['probability']:.1%}",
+        help="Out of a hundred people with this description in the 1994 census, "
+             "roughly this many were above the income threshold.")
     columns[0].caption(f"Band covers {outcome['range']}")
     columns[1].write(f"**{name}.** {outcome['interpretation']}")
 
@@ -207,6 +297,44 @@ def assessment_tab():
     show_outcome(st.session_state.assessment)
 
 
+def odds_phrase(contribution):
+    """Translate a log odds contribution into plain English.
+
+    Exponentiating a log odds contribution gives the factor it multiplies the
+    odds by, which is the same number expressed in a way that does not require
+    knowing what a log odd is. A contribution of +0.80 becomes 2.2 times the
+    odds; a contribution of -0.20 becomes 0.8 times.
+    """
+    factor = float(np.exp(contribution))
+
+    if 0.97 <= factor <= 1.03:
+        return "barely moved the odds"
+    if factor >= 1:
+        return f"multiplied the odds by {factor:.1f}"
+    return f"cut the odds to {factor:.2f} of what they were"
+
+
+def number_glossary():
+    """Explain the figures on this page for a reader who does not work with them."""
+    st.markdown(
+        """
+| Term | What it means in plain English |
+| --- | --- |
+| **Probability** | How sure the model is, from 0 to 100 percent. Seventy percent means that out of a hundred similar people, about seventy were above the threshold. |
+| **Log odds** | The unit the model works in internally. Zero means no effect. Positive pushes towards the upper bracket, negative pushes away. It is not a percentage and not an amount of money. |
+| **Odds multiplier** | The same figure made readable. A contribution of +0.80 multiplies the odds by 2.2, so this attribute made the upper bracket a little over twice as likely. |
+| **Accuracy** | How often the model puts a person on the correct side of the threshold. |
+| **Recall** | Of the people who really are above the threshold, how many the model finds. Low recall means it misses people. |
+| **Precision** | When the model says upper bracket, how often it is right. |
+| **F1** | Precision and recall combined into one number, so a model cannot look good by being cautious. |
+| **ROC-AUC** | How well the model ranks people. One is perfect, 0.5 is a coin flip. |
+| **Brier score** | How honest the percentages are. Zero is perfect, lower is better. |
+| **Calibration error** | The average gap between what the model predicted and what actually happened. Small means a stated seventy percent really behaves like seventy percent. |
+| **Selection rate** | How often the model predicts the upper bracket for a group. A gap between groups is not automatically unfair, but it always needs explaining. |
+"""
+    )
+
+
 TOWARDS_COLOUR = "#2E7D5B"
 AWAY_COLOUR = "#B5533C"
 
@@ -230,10 +358,11 @@ def contribution_chart(table):
 
     labels = [READABLE.get(a, a) for a in ordered["attribute"]]
     values = ordered["contribution"].tolist()
-    colours = [TOWARDS_COLOUR if v >= 0 else AWAY_COLOUR for v in values]
+    colours = [COLOURS["towards"] if v >= 0 else COLOURS["away"] for v in values]
     hover = [
         f"{label}: {format_attribute_value(value)}"
         f"<br>contribution {contribution:+.3f} log odds"
+        f"<br>{odds_phrase(contribution)}"
         for label, value, contribution in zip(labels, ordered["value"], values)
     ]
 
@@ -248,9 +377,11 @@ def contribution_chart(table):
         height=32 * len(labels) + 90,
         margin=dict(l=10, r=10, t=10, b=40),
         xaxis=dict(title="Contribution in log odds", range=[-span, span],
-                   zeroline=True, zerolinewidth=1, zerolinecolor="#666666"),
+                   zeroline=True, zerolinewidth=1, zerolinecolor=COLOURS["muted"],
+                   gridcolor=COLOURS["surface"]),
         yaxis=dict(title=None),
-        plot_bgcolor="#FFFFFF",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
     )
     return figure
@@ -304,13 +435,15 @@ def explanation_tab():
         columns[0].metric(
             "Strongest push towards",
             READABLE.get(row["attribute"], row["attribute"]),
-            f"{row['contribution']:+.3f}")
+            f"{row['contribution']:+.3f}",
+            help=f"This attribute {odds_phrase(row['contribution'])}.")
     if not away.empty:
         row = away.iloc[0]
         columns[1].metric(
             "Strongest push away",
             READABLE.get(row["attribute"], row["attribute"]),
-            f"{row['contribution']:+.3f}")
+            f"{row['contribution']:+.3f}",
+            help=f"This attribute {odds_phrase(row['contribution'])}.")
 
     st.plotly_chart(contribution_chart(table), width="stretch")
 
@@ -321,11 +454,19 @@ def explanation_tab():
         display = table.copy()
         display["attribute"] = [READABLE.get(a, a) for a in display["attribute"]]
         display["value"] = display["value"].map(format_attribute_value)
+        display["plain"] = display["contribution"].map(odds_phrase)
         display["contribution"] = display["contribution"].map(lambda v: f"{v:+.3f}")
         display = display.rename(columns={
             "attribute": "Attribute", "value": "Value",
-            "contribution": "Contribution (log odds)", "direction": "Direction"})
-        st.dataframe(display, width="stretch", hide_index=True)
+            "contribution": "Contribution (log odds)",
+            "plain": "In plain English", "direction": "Direction"})
+        st.dataframe(
+            display[["Attribute", "Value", "Contribution (log odds)",
+                     "In plain English"]],
+            width="stretch", hide_index=True)
+
+    with st.expander("What do these numbers mean?"):
+        number_glossary()
 
 
 CATEGORY_ORDER = ["This prediction", "Why", "The model", "The data",
@@ -471,11 +612,24 @@ def decision_band_summary():
     st.write(evidence_sentence())
 
     columns = st.columns(4)
-    columns[0].metric("Referred to a person", f"{evidence['referral_rate']:.1%}")
-    columns[1].metric("Accuracy when automated", f"{evidence['automated_accuracy']:.1%}",
-                      f"{evidence['accuracy_gain']:+.1%}")
-    columns[2].metric("Brier score", f"{evidence['brier_score']:.4f}")
-    columns[3].metric("Calibration error", f"{evidence['expected_calibration_error']:.4f}")
+    columns[0].metric(
+        "Referred to a person", f"{evidence['referral_rate']:.1%}",
+        help="Share of cases the model declines to decide, sending them to a human "
+             "assessor instead.")
+    columns[1].metric(
+        "Accuracy when automated", f"{evidence['automated_accuracy']:.1%}",
+        f"{evidence['accuracy_gain']:+.1%}",
+        help="Accuracy on the cases that are decided automatically. The change shown "
+             "is the improvement over deciding everything with a single cut off.")
+    columns[2].metric(
+        "Brier score", f"{evidence['brier_score']:.4f}",
+        help="How honest the percentages are. Zero is perfect. Always predicting "
+             "fifty percent would score 0.25.")
+    columns[3].metric(
+        "Calibration error", f"{evidence['expected_calibration_error']:.4f}",
+        help="Average gap between what the model predicted and what actually "
+             "happened. Small means a stated seventy percent behaves like seventy "
+             "percent.")
     st.caption(
         "A low calibration error means a predicted probability can be read as a "
         "probability rather than only as a ranking, which is what allows the bands "
@@ -493,11 +647,20 @@ def conversational_summary(intent_metrics):
     )
 
     columns = st.columns(4)
-    columns[0].metric("Intents", intent_metrics["intents"])
-    columns[1].metric("Training phrasings", intent_metrics["patterns"])
-    columns[2].metric("Button accuracy", f"{intent_metrics['display_accuracy']:.0%}")
-    columns[3].metric("Unseen phrasing accuracy",
-                      f"{intent_metrics['out_of_fold_accuracy']:.0%}")
+    columns[0].metric(
+        "Intents", intent_metrics["intents"],
+        help="Distinct questions the chatbot recognises.")
+    columns[1].metric(
+        "Training phrasings", intent_metrics["patterns"],
+        help="Hand written example wordings the classifier learned from.")
+    columns[2].metric(
+        "Button accuracy", f"{intent_metrics['display_accuracy']:.0%}",
+        help="Share of the question buttons that reach the right answer. None of "
+             "those wordings appeared in training.")
+    columns[3].metric(
+        "Unseen phrasing accuracy", f"{intent_metrics['out_of_fold_accuracy']:.0%}",
+        help="How often an arbitrary rewording reaches the right intent. Much lower, "
+             "because the questions are numerous and similar to each other.")
 
     st.caption(
         f"The two accuracy figures measure different things and both are reported. "
@@ -570,6 +733,9 @@ def model_tab():
     for section in limitations.panel_text():
         with st.expander(section["heading"]):
             st.write(section["body"])
+
+    with st.expander("What do all these numbers mean?"):
+        number_glossary()
 
 
 def main():

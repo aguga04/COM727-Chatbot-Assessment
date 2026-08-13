@@ -1,10 +1,10 @@
-# Income Bracket Decision Support Chatbot
+# Nexus Income Bracket Chatbot
 
-A web application that predicts whether a person falls above or below the 1994 US census income
-threshold, explains exactly which attributes drove that prediction, routes uncertain cases to a human
-assessor, and answers questions about itself through a trained conversational model.
+A decision support helper for income bracket assessment. It reports whether a person is likely to fall above or below the US census income threshold, explains in plain language which attributes drove that outcome, and refers cases it cannot separate to a human assessor rather than deciding them automatically. A separate trained conversational model answers questions about the system itself, including its accuracy, its reasoning and its documented bias, so technical and non-technical readers can interrogate it on equal terms.
 
-Built for COM727 Introduction to AI, Southampton Solent University.
+The underlying classifier learns from the 1994 US Census. That vintage is a limitation the application states plainly rather than works around, and examining what it does to the outcomes is part of what the project sets out to demonstrate.
+
+Group project by [Team Nexus](#team-nexus-members) for COM727 Introduction to AI, MSc Applied AI and Data Science, Southampton Solent University.
 
 **Live application:** _pending deployment_
 
@@ -19,8 +19,8 @@ Built for COM727 Introduction to AI, Southampton Solent University.
 - [Reproducing the results](#reproducing-the-results)
 - [Running the application](#running-the-application)
 - [Results](#results)
-- [Deployment](#deployment)
 - [Limitations](#limitations)
+- [Team Nexus Members](#team-nexus-members)
 - [References](#references)
 - [Licence](#licence)
 
@@ -298,6 +298,16 @@ same information. A classifier recovers sex from the remaining features at 84.6 
 **It must not be used to decide about real people.** Applying a system of this kind to lending,
 employment or housing would raise indirect discrimination questions under sections 19 and 29 of the
 Equality Act 2010, and the evidence above indicates it would not withstand that scrutiny.
+
+---
+
+## Team Nexus Members
+
+- Ausbeth Aguguo
+- Bhoomika Sri Bollu
+- Darya Huryniuk
+- Hillary Okojie
+- Folakemi Olafisoye
 
 ---
 
