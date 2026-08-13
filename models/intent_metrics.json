@@ -1,0 +1,345 @@
+{
+  "evaluated_at": "2026-08-13T07:53:46+00:00",
+  "intents": 38,
+  "patterns": 305,
+  "vocabulary_size": 323,
+  "alpha": 0.3,
+  "binary_presence": true,
+  "cross_validation_folds": 4,
+  "out_of_fold_accuracy": 0.3836065573770492,
+  "macro_f1": 0.3796892311090958,
+  "weighted_f1": 0.378867404967966,
+  "display_accuracy": 1.0,
+  "display_confidence": {
+    "lowest": 0.11606180176860452,
+    "median": 0.8302680294215175,
+    "highest": 0.9958052082278798
+  },
+  "confidence_threshold": 0.1,
+  "threshold_effect": {
+    "buttons_suppressed": 0,
+    "wrong_answers_caught": 57,
+    "wrong_answers_total": 188,
+    "correct_answers_lost": 2
+  },
+  "per_intent": [
+    {
+      "intent": "goodbye",
+      "support": 8,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "intent": "out_of_scope",
+      "support": 8,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "intent": "verdict",
+      "support": 8,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "intent": "effect_age",
+      "support": 9,
+      "precision": 0.09090909090909091,
+      "recall": 0.2222222222222222,
+      "f1": 0.12903225806451613
+    },
+    {
+      "intent": "which_algorithm",
+      "support": 8,
+      "precision": 0.14285714285714285,
+      "recall": 0.125,
+      "f1": 0.13333333333333333
+    },
+    {
+      "intent": "precision_and_recall",
+      "support": 8,
+      "precision": 0.14285714285714285,
+      "recall": 0.125,
+      "f1": 0.13333333333333333
+    },
+    {
+      "intent": "effect_occupation",
+      "support": 8,
+      "precision": 0.2,
+      "recall": 0.25,
+      "f1": 0.2222222222222222
+    },
+    {
+      "intent": "data_age",
+      "support": 8,
+      "precision": 0.2222222222222222,
+      "recall": 0.25,
+      "f1": 0.23529411764705882
+    },
+    {
+      "intent": "effect_education",
+      "support": 8,
+      "precision": 0.25,
+      "recall": 0.25,
+      "f1": 0.25
+    },
+    {
+      "intent": "how_explanation_works",
+      "support": 8,
+      "precision": 0.25,
+      "recall": 0.25,
+      "f1": 0.25
+    },
+    {
+      "intent": "how_accurate",
+      "support": 8,
+      "precision": 0.4,
+      "recall": 0.25,
+      "f1": 0.3076923076923077
+    },
+    {
+      "intent": "effect_marital_status",
+      "support": 8,
+      "precision": 0.4,
+      "recall": 0.25,
+      "f1": 0.3076923076923077
+    },
+    {
+      "intent": "capabilities",
+      "support": 8,
+      "precision": 0.2222222222222222,
+      "recall": 0.5,
+      "f1": 0.3076923076923077
+    },
+    {
+      "intent": "probability",
+      "support": 8,
+      "precision": 0.4,
+      "recall": 0.25,
+      "f1": 0.3076923076923077
+    },
+    {
+      "intent": "is_it_calibrated",
+      "support": 8,
+      "precision": 0.5,
+      "recall": 0.25,
+      "f1": 0.3333333333333333
+    },
+    {
+      "intent": "effect_hours",
+      "support": 8,
+      "precision": 0.6666666666666666,
+      "recall": 0.25,
+      "f1": 0.36363636363636365
+    },
+    {
+      "intent": "limitations_overview",
+      "support": 8,
+      "precision": 0.2631578947368421,
+      "recall": 0.625,
+      "f1": 0.37037037037037035
+    },
+    {
+      "intent": "dataset_size",
+      "support": 8,
+      "precision": 0.375,
+      "recall": 0.375,
+      "f1": 0.375
+    },
+    {
+      "intent": "is_it_fair",
+      "support": 8,
+      "precision": 0.3076923076923077,
+      "recall": 0.5,
+      "f1": 0.38095238095238093
+    },
+    {
+      "intent": "proxy_variables",
+      "support": 8,
+      "precision": 1.0,
+      "recall": 0.25,
+      "f1": 0.4
+    },
+    {
+      "intent": "why_this_algorithm",
+      "support": 8,
+      "precision": 0.3333333333333333,
+      "recall": 0.5,
+      "f1": 0.4
+    },
+    {
+      "intent": "features_used",
+      "support": 8,
+      "precision": 0.5,
+      "recall": 0.375,
+      "f1": 0.42857142857142855
+    },
+    {
+      "intent": "defaulted_fields",
+      "support": 8,
+      "precision": 0.5,
+      "recall": 0.375,
+      "f1": 0.42857142857142855
+    },
+    {
+      "intent": "how_thresholds_chosen",
+      "support": 8,
+      "precision": 0.6,
+      "recall": 0.375,
+      "f1": 0.46153846153846156
+    },
+    {
+      "intent": "top_negative_factor",
+      "support": 8,
+      "precision": 0.4444444444444444,
+      "recall": 0.5,
+      "f1": 0.47058823529411764
+    },
+    {
+      "intent": "threshold_meaning",
+      "support": 8,
+      "precision": 0.4444444444444444,
+      "recall": 0.5,
+      "f1": 0.47058823529411764
+    },
+    {
+      "intent": "greeting",
+      "support": 8,
+      "precision": 0.38461538461538464,
+      "recall": 0.625,
+      "f1": 0.47619047619047616
+    },
+    {
+      "intent": "sex_and_race",
+      "support": 8,
+      "precision": 0.75,
+      "recall": 0.375,
+      "f1": 0.5
+    },
+    {
+      "intent": "thanks",
+      "support": 8,
+      "precision": 0.75,
+      "recall": 0.375,
+      "f1": 0.5
+    },
+    {
+      "intent": "data_source",
+      "support": 8,
+      "precision": 0.45454545454545453,
+      "recall": 0.625,
+      "f1": 0.5263157894736842
+    },
+    {
+      "intent": "top_factor",
+      "support": 8,
+      "precision": 0.5714285714285714,
+      "recall": 0.5,
+      "f1": 0.5333333333333333
+    },
+    {
+      "intent": "referral_meaning",
+      "support": 8,
+      "precision": 1.0,
+      "recall": 0.375,
+      "f1": 0.5454545454545454
+    },
+    {
+      "intent": "band_meaning",
+      "support": 8,
+      "precision": 0.46153846153846156,
+      "recall": 0.75,
+      "f1": 0.5714285714285714
+    },
+    {
+      "intent": "effect_capital_gain",
+      "support": 8,
+      "precision": 0.5,
+      "recall": 0.75,
+      "f1": 0.6
+    },
+    {
+      "intent": "full_breakdown",
+      "support": 8,
+      "precision": 0.625,
+      "recall": 0.625,
+      "f1": 0.625
+    },
+    {
+      "intent": "real_world_use",
+      "support": 8,
+      "precision": 0.7142857142857143,
+      "recall": 0.625,
+      "f1": 0.6666666666666666
+    },
+    {
+      "intent": "who_built_this",
+      "support": 8,
+      "precision": 0.7142857142857143,
+      "recall": 0.625,
+      "f1": 0.6666666666666666
+    },
+    {
+      "intent": "what_if_change",
+      "support": 8,
+      "precision": 0.75,
+      "recall": 0.75,
+      "f1": 0.75
+    }
+  ],
+  "top_confusions": [
+    {
+      "actual": "goodbye",
+      "predicted": "greeting",
+      "count": 3
+    },
+    {
+      "actual": "goodbye",
+      "predicted": "effect_age",
+      "count": 3
+    },
+    {
+      "actual": "referral_meaning",
+      "predicted": "band_meaning",
+      "count": 3
+    },
+    {
+      "actual": "precision_and_recall",
+      "predicted": "limitations_overview",
+      "count": 3
+    },
+    {
+      "actual": "greeting",
+      "predicted": "effect_age",
+      "count": 3
+    },
+    {
+      "actual": "defaulted_fields",
+      "predicted": "data_source",
+      "count": 2
+    },
+    {
+      "actual": "data_age",
+      "predicted": "is_it_fair",
+      "count": 2
+    },
+    {
+      "actual": "effect_education",
+      "predicted": "effect_age",
+      "count": 2
+    },
+    {
+      "actual": "effect_marital_status",
+      "predicted": "effect_occupation",
+      "count": 2
+    },
+    {
+      "actual": "verdict",
+      "predicted": "top_negative_factor",
+      "count": 2
+    }
+  ]
+}
