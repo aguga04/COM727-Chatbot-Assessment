@@ -19,7 +19,8 @@ import streamlit as st
 
 from src import config
 from src.chatbot import limitations
-from src.chatbot.engine import READABLE, question_buttons, respond
+from src.chatbot.engine import (READABLE, format_probability,
+                                question_buttons, respond)
 from src.decision import band_evidence, decide, evidence_sentence, load_thresholds
 from src.explain import explain
 from src.nlp import ensure_corpora
@@ -135,15 +136,16 @@ def header(metadata):
     with right:
         st.markdown(
             "<div style='font-size:2.1rem;font-weight:700;line-height:1.1;"
-            "color:inherit'>Team Nexus</div>"
+            "color:inherit'>Nexus</div>"
             "<div style='font-size:1.2rem;font-weight:500;color:inherit;"
             "opacity:0.85'>Income Bracket Chatbot</div>",
             unsafe_allow_html=True)
 
     st.caption(
-        "A decision support helper for income bracket assessment."
-        "It explains every outcome in plain language, refers uncertain cases to a person,"
-        "and answers questions about its own limits."
+        "Predicts whether a person falls above or below the 1994 US census income "
+        "threshold, explains which attributes drove that prediction, and routes "
+        "uncertain cases to a human assessor. Built for COM727 by team Nexus. Not a "
+        "tool for deciding anything about a real person."
     )
 
     held_out = metadata["metrics"]["held_out_test"]
@@ -156,10 +158,13 @@ def header(metadata):
         "Recall", f"{held_out['recall']:.1%}",
         help="Of the people who genuinely are above the threshold, this share is "
              "correctly identified. The rest are missed.")
+    rows = metadata["rows"]
     columns[2].metric(
-        "Records held back", f"{metadata['rows']['held_out_test']:,}",
-        help="Census records kept aside during training and used only for scoring, "
-             "so the figures above are not flattered by memorisation.")
+        "Data split",
+        f"{rows['train']:,} / {rows['validation']:,} / {rows['held_out_test']:,}",
+        help="Training, validation, and held back for final testing. The held-back "
+             "records were never seen during training, so the accuracy shown here is "
+             "not flattered by memorisation.")
     columns[3].metric(
         "Attributes used", metadata["feature_count"],
         help="Thirteen real world attributes become this many numeric columns once "
@@ -176,10 +181,31 @@ def show_warnings(warnings):
         )
 
 
+# A bare dollar sign starts LaTeX maths in Streamlit markdown, which swallows the
+# text between two of them. Escaping keeps the symbol literal.
+UPPER_LABEL = r"Upper bracket, over \$50,000"
+LOWER_LABEL = r"Lower bracket, \$50,000 or under"
+
+# Bands are named by what the model concluded, not by an action taken against a
+# person. Calling them accept and reject would claim the system makes lending
+# decisions, which is exactly what the limitations panel says it must not do.
+# The credit screening analogy is named once in prose beneath instead.
 BAND_STYLE = {
-    "below": ("Likely below the threshold", "#5A6B7C"),
-    "referral": ("Refer for human assessment", "#8C4A1F"),
-    "above": ("Likely above the threshold", "#2E7D5B"),
+    "below": {
+        "heading": "Lower bracket",
+        "colour": "#1B3A5C",
+        "strip": "Confident enough to answer automatically.",
+    },
+    "referral": {
+        "heading": "Refer for human assessment",
+        "colour": "#8C4A1F",
+        "strip": "Too close to call. This case needs a person.",
+    },
+    "above": {
+        "heading": "Upper bracket",
+        "colour": "#2E7D5B",
+        "strip": "Confident enough to answer automatically.",
+    },
 }
 
 
@@ -233,31 +259,143 @@ def assessment_form():
     return answers if st.button("Assess", type="primary") else None
 
 
+def tint(hex_colour, alpha):
+    """Return a hex colour as a translucent rgba string."""
+    red, green, blue = (int(hex_colour[i:i + 2], 16) for i in (1, 3, 5))
+    return f"rgba({red},{green},{blue},{alpha})"
+
+
+def band_strip(probability, band):
+    """Draw the three bands as one bar, marking where this person falls.
+
+    Makes the routing visible rather than implied. The reader can see that the
+    system has three outcomes, where the boundaries sit, and which side of them
+    this case landed on.
+
+    Inactive segments keep their colour as text on a pale tint rather than being
+    faded out, because a faded segment on a white page loses its edges and the
+    reader can no longer see that three bands exist.
+    """
+    thresholds = load_thresholds()
+    low, high = thresholds["lower"], thresholds["upper"]
+    marker = min(max(probability, 0.0), 1.0) * 100
+
+    segments = [
+        ("below", "Lower bracket", round(low * 100, 2)),
+        ("referral", "Refer to a person", round((high - low) * 100, 2)),
+        ("above", "Upper bracket", round((1 - high) * 100, 2)),
+    ]
+
+    cells = ""
+    for key, name, width in segments:
+        colour = BAND_STYLE[key]["colour"]
+        active = key == band
+        cells += (
+            f"<div style='flex:0 0 {width}%;padding:7px 4px;text-align:center;"
+            f"font-size:0.78rem;font-weight:{'700' if active else '600'};"
+            f"color:{'#FFFFFF' if active else colour};"
+            f"background:{colour if active else tint(colour, 0.16)};"
+            f"border-right:1px solid rgba(255,255,255,0.85)'>{name}</div>"
+        )
+
+    ticks = "".join(
+        f"<span style='position:absolute;left:{position}%;{shift};"
+        f"font-size:0.7rem;opacity:0.65'>{label}</span>"
+        for position, label, shift in [
+            (0, "0%", "transform:translateX(0)"),
+            (low * 100, f"{low:.0%}", "transform:translateX(-50%)"),
+            (high * 100, f"{high:.0%}", "transform:translateX(-50%)"),
+            (100, "100%", "transform:translateX(-100%)"),
+        ]
+    )
+
+    st.markdown(
+        f"<div style='margin:0.4rem 0 0.2rem 0'>"
+        f"<div style='display:flex;border-radius:5px;overflow:hidden;"
+        f"border:1px solid rgba(0,0,0,0.12)'>{cells}</div>"
+        f"<div style='position:relative;height:19px'>"
+        f"<span style='position:absolute;left:{marker}%;transform:translateX(-50%);"
+        f"font-size:0.74rem;font-weight:600'>&#9650; {probability:.1%}</span></div>"
+        f"<div style='position:relative;height:14px'>{ticks}</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def leaning_sentence(probability, band):
+    """Say in one line what the binary prediction is and how firmly it is held.
+
+    The percentage is formatted so that a very small probability does not round
+    to zero, which would read as an impossibility rather than as a small number.
+    """
+    if band == "referral":
+        leaning = "upper" if probability >= 0.5 else "lower"
+        return (
+            f"The model puts the chance of the upper bracket at "
+            f"{format_probability(probability)}. "
+            f"That leans towards the {leaning} bracket, but not firmly enough to act "
+            f"on, so this case is referred rather than answered."
+        )
+
+    if probability >= 0.5:
+        return (
+            f"The model puts the chance of the upper bracket at "
+            f"{format_probability(probability)}, so its answer is {UPPER_LABEL.lower()}."
+        )
+
+    return (
+        f"The model puts the chance of the upper bracket at "
+        f"{format_probability(probability)}, so its answer is {LOWER_LABEL.lower()}."
+    )
+
+
 def show_outcome(assessment):
     """Report the band, the recommended action and what was assumed."""
-    outcome = decide(assessment["probability"])
-    heading, colour = BAND_STYLE[outcome["band"]]
+    probability = assessment["probability"]
+    outcome = decide(probability)
+    style = BAND_STYLE[outcome["band"]]
     name = st.session_state.person_name.strip() or "This person"
 
     st.markdown(
-        f"<div style='border-left:6px solid {colour};padding:0.6rem 1rem;"
+        f"<div style='border-left:6px solid {style['colour']};padding:0.6rem 1rem;"
         f"background:{COLOURS['surface']};border-radius:4px'>"
-        f"<div style='font-size:1.35rem;font-weight:600;color:{colour}'>{heading}</div>"
+        f"<div style='font-size:1.35rem;font-weight:600;color:{style['colour']}'>"
+        f"{style['heading']}</div>"
         f"<div style='margin-top:0.3rem'>{outcome['action']}</div></div>",
         unsafe_allow_html=True,
     )
 
     st.write("")
-    columns = st.columns([2, 3])
-    columns[0].metric(
-        "Probability of the upper bracket",
-        f"{assessment['probability']:.1%}",
-        help="Out of a hundred people with this description in the 1994 census, "
-             "roughly this many were above the income threshold.")
-    columns[0].caption(f"Band covers {outcome['range']}")
-    columns[1].write(f"**{name}.** {outcome['interpretation']}")
+    st.markdown(f"**{name}.** {leaning_sentence(probability, outcome['band'])}")
 
-    st.progress(min(max(assessment["probability"], 0.0), 1.0))
+    st.caption(
+        "This is a two way choice. Every person is placed in one of two brackets "
+        f"recorded by the 1994 census: {UPPER_LABEL.lower()}, or "
+        f"{LOWER_LABEL.lower()}. The percentage is how sure the model is of the "
+        "first of those, so anything under 50 percent leans towards the second."
+    )
+
+    thresholds = load_thresholds()
+    st.markdown(
+        f"**What the bands are.** A band is a range of confidence, not a range of "
+        f"income. The percentage above falls somewhere between 0 and 100, and we "
+        f"divide that line into three parts. Below {thresholds['lower']:.0%} and "
+        f"above {thresholds['upper']:.0%} the model is sure enough to answer on its "
+        f"own. In between it is not, so the case goes to a person. The bar below "
+        f"shows those three parts and where this case landed."
+    )
+
+    band_strip(probability, outcome["band"])
+
+    st.caption(
+        f"{style['strip']} This mirrors the accept, refer and decline routing used in "
+        f"credit screening, where confident cases are handled automatically and "
+        f"borderline ones are passed to a human. The {thresholds['lower']:.0%} and "
+        f"{thresholds['upper']:.0%} boundaries were chosen by measuring accuracy "
+        "against how many cases each setting would send to a person, not by "
+        "preference."
+    )
+
+    st.info(f"{outcome['interpretation']}", icon="ℹ")
 
     untouched = st.session_state.untouched_fields
     if untouched:
@@ -268,6 +406,11 @@ def show_outcome(assessment):
         )
     else:
         st.caption("Every field was set deliberately. Nothing was assumed.")
+
+    st.caption(
+        "This describes patterns in 1994 census data, not this person. It is not a "
+        "statement about what anyone earns."
+    )
 
 
 def assessment_tab():
@@ -298,20 +441,26 @@ def assessment_tab():
 
 
 def odds_phrase(contribution):
-    """Translate a log odds contribution into plain English.
+    """Translate a log odds contribution into everyday language.
 
-    Exponentiating a log odds contribution gives the factor it multiplies the
-    odds by, which is the same number expressed in a way that does not require
-    knowing what a log odd is. A contribution of +0.80 becomes 2.2 times the
-    odds; a contribution of -0.20 becomes 0.8 times.
+    Exponentiating the contribution gives the factor it multiplies the odds by,
+    which is the same figure without requiring anyone to know what a log odd is.
+    The wording leads with direction and strength so a reader who wants only the
+    gist can stop after three words, and the multiplier follows for anyone who
+    wants the size. The word odds is avoided, since it is the term a non
+    technical reader stumbles on.
     """
+    size = abs(float(contribution))
+
+    if size < 0.05:
+        return "No real effect"
+
+    strength = "Strong" if size >= 0.7 else "Moderate" if size >= 0.3 else "Slight"
     factor = float(np.exp(contribution))
 
-    if 0.97 <= factor <= 1.03:
-        return "barely moved the odds"
-    if factor >= 1:
-        return f"multiplied the odds by {factor:.1f}"
-    return f"cut the odds to {factor:.2f} of what they were"
+    if contribution > 0:
+        return f"{strength} push up, about {factor:.1f} times more likely"
+    return f"{strength} push down, about {factor:.1f} times as likely"
 
 
 def number_glossary():
@@ -320,9 +469,10 @@ def number_glossary():
         """
 | Term | What it means in plain English |
 | --- | --- |
+| **Band** | A range of confidence, not a range of income. The scale from 0 to 100 percent is split into three parts: confident lower, uncertain, confident upper. Which part a case falls into decides whether the system answers it or refers it to a person. |
 | **Probability** | How sure the model is, from 0 to 100 percent. Seventy percent means that out of a hundred similar people, about seventy were above the threshold. |
 | **Log odds** | The unit the model works in internally. Zero means no effect. Positive pushes towards the upper bracket, negative pushes away. It is not a percentage and not an amount of money. |
-| **Odds multiplier** | The same figure made readable. A contribution of +0.80 multiplies the odds by 2.2, so this attribute made the upper bracket a little over twice as likely. |
+| **Times more likely** | The same figure made readable. A contribution of +0.80 means the attribute made the upper bracket about 2.2 times more likely. Below 1.0 means less likely. |
 | **Accuracy** | How often the model puts a person on the correct side of the threshold. |
 | **Recall** | Of the people who really are above the threshold, how many the model finds. Low recall means it misses people. |
 | **Precision** | When the model says upper bracket, how often it is right. |
@@ -436,18 +586,23 @@ def explanation_tab():
             "Strongest push towards",
             READABLE.get(row["attribute"], row["attribute"]),
             f"{row['contribution']:+.3f}",
-            help=f"This attribute {odds_phrase(row['contribution'])}.")
+            help=odds_phrase(row["contribution"]))
     if not away.empty:
         row = away.iloc[0]
         columns[1].metric(
             "Strongest push away",
             READABLE.get(row["attribute"], row["attribute"]),
             f"{row['contribution']:+.3f}",
-            help=f"This attribute {odds_phrase(row['contribution'])}.")
+            help=odds_phrase(row["contribution"]))
 
     st.plotly_chart(contribution_chart(table), width="stretch")
 
-    with st.expander("How this adds up"):
+    with st.expander("Check these figures add up (technical)"):
+        st.caption(
+            "The chart above shows what each attribute did. This shows that those "
+            "figures rebuild the model's own output exactly rather than "
+            "approximating it, which is what makes the explanation checkable."
+        )
         arithmetic_block(explanation, assessment)
 
     with st.expander("Every attribute as a table"):
