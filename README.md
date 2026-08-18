@@ -2,7 +2,7 @@
 
 A decision support helper for income bracket assessment. It reports whether a person is likely to fall above or below the US census income threshold, explains in plain language which attributes drove that outcome, and refers cases it cannot separate to a human assessor rather than deciding them automatically. A separate trained conversational model answers questions about the system itself, including its accuracy, its reasoning and its documented bias, so technical and non-technical readers can interrogate it on equal terms.
 
-The underlying classifier learns from the 1994 US Census. That vintage is a limitation the application states plainly rather than works around, and examining what it does to the outcomes is part of what the project sets out to demonstrate.
+**Disclaimer:** The underlying classifier learns from the 1994 US Census. That vintage is a limitation the application states plainly rather than works around, and examining what it does to the outcomes is part of what the project sets out to demonstrate. This project was built as coursework and must not be used to assess a real person. Using a system of this kind for a lending, employment or housing decision would risk indirect discrimination under the Equality Act 2010.
 
 Group project by [Team Nexus](#team-nexus-members) for COM727 Introduction to AI, MSc Applied AI and Data Science, Southampton Solent University.
 

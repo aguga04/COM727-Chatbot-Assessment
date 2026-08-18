@@ -330,21 +330,55 @@ def leaning_sentence(probability, band):
     if band == "referral":
         leaning = "upper" if probability >= 0.5 else "lower"
         return (
-            f"The model puts the chance of the upper bracket at "
-            f"{format_probability(probability)}. "
             f"That leans towards the {leaning} bracket, but not firmly enough to act "
             f"on, so this case is referred rather than answered."
         )
 
     if probability >= 0.5:
-        return (
-            f"The model puts the chance of the upper bracket at "
-            f"{format_probability(probability)}, so its answer is {UPPER_LABEL.lower()}."
-        )
+        return f"That is a clear enough lean, so its answer is {UPPER_LABEL.lower()}."
 
-    return (
-        f"The model puts the chance of the upper bracket at "
-        f"{format_probability(probability)}, so its answer is {LOWER_LABEL.lower()}."
+    return f"That is a clear enough lean, so its answer is {LOWER_LABEL.lower()}."
+
+
+def result_banner(name, colour):
+    """Draw the centred heading that opens the result."""
+    st.markdown(
+        f"<div style='background:{colour};border-radius:6px;padding:0.55rem 1rem;"
+        f"text-align:center;margin:0.2rem 0 0.9rem 0'>"
+        f"<span style='color:#FFFFFF;font-size:1.25rem;font-weight:700;"
+        f"letter-spacing:0.01em'>Results for {name}</span></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def probability_card(probability, colour):
+    """Show the figure the whole result turns on, at a size that reads across a room."""
+    st.markdown(
+        f"<div style='border:1px solid {tint(colour, 0.35)};border-radius:6px;"
+        f"background:{tint(colour, 0.08)};padding:1.1rem 1rem;text-align:center;"
+        f"height:100%'>"
+        f"<div style='font-size:0.86rem;opacity:0.75;line-height:1.3'>"
+        f"The model puts the chance of the</div>"
+        f"<div style='font-size:0.95rem;font-weight:600;opacity:0.85;"
+        f"margin-bottom:0.35rem'>upper bracket at</div>"
+        f"<div style='font-size:3.4rem;font-weight:700;line-height:1;"
+        f"color:{colour}'>{format_probability(probability)}</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def verdict_card(style):
+    """Show the routing decision and the action it calls for."""
+    st.markdown(
+        f"<div style='border-left:6px solid {style['colour']};"
+        f"border-radius:6px;background:{COLOURS['surface']};"
+        f"padding:1.1rem 1.2rem;height:100%'>"
+        f"<div style='font-size:1.3rem;font-weight:700;color:{style['colour']};"
+        f"margin-bottom:0.4rem'>{style['heading']}</div>"
+        f"<div style='line-height:1.45'>{style['action']}</div>"
+        f"<div style='margin-top:0.5rem;font-size:0.85rem;opacity:0.75'>"
+        f"{style['strip']}</div></div>",
+        unsafe_allow_html=True,
     )
 
 
@@ -352,50 +386,52 @@ def show_outcome(assessment):
     """Report the band, the recommended action and what was assumed."""
     probability = assessment["probability"]
     outcome = decide(probability)
-    style = BAND_STYLE[outcome["band"]]
-    name = st.session_state.person_name.strip() or "This person"
+    style = dict(BAND_STYLE[outcome["band"]])
+    style["action"] = outcome["action"]
+    name = st.session_state.person_name.strip() or "this person"
+    thresholds = load_thresholds()
 
-    st.markdown(
-        f"<div style='border-left:6px solid {style['colour']};padding:0.6rem 1rem;"
-        f"background:{COLOURS['surface']};border-radius:4px'>"
-        f"<div style='font-size:1.35rem;font-weight:600;color:{style['colour']}'>"
-        f"{style['heading']}</div>"
-        f"<div style='margin-top:0.3rem'>{outcome['action']}</div></div>",
-        unsafe_allow_html=True,
-    )
+    result_banner(name, style["colour"])
+
+    left, right = st.columns(2, gap="medium")
+    with left:
+        probability_card(probability, style["colour"])
+    with right:
+        verdict_card(style)
 
     st.write("")
-    st.markdown(f"**{name}.** {leaning_sentence(probability, outcome['band'])}")
+    st.markdown(f"**{leaning_sentence(probability, outcome['band'])}**")
 
-    st.caption(
-        "This is a two way choice. Every person is placed in one of two brackets "
-        f"recorded by the 1994 census: {UPPER_LABEL.lower()}, or "
-        f"{LOWER_LABEL.lower()}. The percentage is how sure the model is of the "
-        "first of those, so anything under 50 percent leans towards the second."
+    st.markdown(
+        "This is a two way choice. Every person is automatically placed in one of "
+        f"two brackets recorded by the 1994 census: {UPPER_LABEL.lower()}, or "
+        f"{LOWER_LABEL.lower()}. The percentage above is how sure the model is of "
+        "the first of those, so anything under 50 percent leans towards the second. "
+        "Bands exist for the borderline cases in the middle, where the percentage "
+        "is not decisive enough for the system to place someone on its own."
     )
 
-    thresholds = load_thresholds()
     st.markdown(
         f"**What the bands are.** A band is a range of confidence, not a range of "
-        f"income. The percentage above falls somewhere between 0 and 100, and we "
-        f"divide that line into three parts. Below {thresholds['lower']:.0%} and "
-        f"above {thresholds['upper']:.0%} the model is sure enough to answer on its "
-        f"own. In between it is not, so the case goes to a person. The bar below "
+        f"income. The percentage falls somewhere between 0 and 100, and we divide "
+        f"that line into three parts. Below {thresholds['lower']:.0%} and above "
+        f"{thresholds['upper']:.0%} the model is sure enough to answer on its own. "
+        f"In between it is not, so the case goes to a person instead. The bar below "
         f"shows those three parts and where this case landed."
     )
 
     band_strip(probability, outcome["band"])
 
     st.caption(
-        f"{style['strip']} This mirrors the accept, refer and decline routing used in "
-        f"credit screening, where confident cases are handled automatically and "
-        f"borderline ones are passed to a human. The {thresholds['lower']:.0%} and "
+        f"This mirrors the accept, refer and decline routing used in credit "
+        f"screening, where confident cases are handled automatically and borderline "
+        f"ones are passed to a human. The {thresholds['lower']:.0%} and "
         f"{thresholds['upper']:.0%} boundaries were chosen by measuring accuracy "
         "against how many cases each setting would send to a person, not by "
         "preference."
     )
 
-    st.info(f"{outcome['interpretation']}", icon="ℹ")
+    st.info(outcome["interpretation"], icon="ℹ")
 
     untouched = st.session_state.untouched_fields
     if untouched:
@@ -597,7 +633,7 @@ def explanation_tab():
 
     st.plotly_chart(contribution_chart(table), width="stretch")
 
-    with st.expander("Check these figures add up (technical)"):
+    with st.expander("Check how these figures add up (technical)"):
         st.caption(
             "The chart above shows what each attribute did. This shows that those "
             "figures rebuild the model's own output exactly rather than "
@@ -915,9 +951,10 @@ def main():
     st.divider()
     trained = context["metadata"]["trained_at"][:10]
     st.caption(
-        f"Model trained {trained} on the UCI Adult dataset, 1994 US Census. "
-        "Predictions describe patterns in that data and are not advice about "
-        "anyone's earnings."
+        f"Model trained {trained} on the UCI Adult dataset, 1994 US Census. "     
+        "Disclaimer. Coursework only. Predictions describe patterns in that data and are not advice about "
+        "anyone's earnings. "
+        "Using it for a real decision would risk indirect discrimination under the Equality Act 2010."
     )
 
 
