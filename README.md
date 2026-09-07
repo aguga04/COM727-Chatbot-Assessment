@@ -1,10 +1,17 @@
 # Nexus Income Bracket Chatbot
 
-A decision support helper for income bracket assessment. It reports whether a person is likely to fall above or below the US census income threshold, explains in plain language which attributes drove that outcome, and refers cases it cannot separate to a human assessor rather than deciding them automatically. A separate trained conversational model answers questions about the system itself, including its accuracy, its reasoning and its documented bias, so technical and non-technical readers can interrogate it on equal terms.
+A decision support helper for income bracket assessment. It classifies whether a person falls above or
+below the US census income threshold, explains in plain language which attributes drove that outcome,
+and refers cases it cannot separate to a human assessor rather than deciding them automatically.
 
-**Disclaimer:** The underlying classifier learns from the 1994 US Census. That vintage is a limitation the application states plainly rather than works around, and examining what it does to the outcomes is part of what the project sets out to demonstrate. This project was built as coursework and must not be used to assess a real person. Using a system of this kind for a lending, employment or housing decision would risk indirect discrimination under the Equality Act 2010.
+**Disclaimer:** The classifier learns from the 1994 US Census. That vintage is a limitation the
+application states plainly rather than works around, and examining what it does to the outcomes is
+part of what the project sets out to demonstrate. This project was built as coursework and must not be
+used to assess a real person. Using a system of this kind for a lending, employment or housing
+decision would risk indirect discrimination under the Equality Act 2010.
 
-Group project by [Team Nexus](#team-nexus-members) for COM727 Introduction to AI, MSc Applied AI and Data Science, Southampton Solent University.
+Group project by [Team Nexus](#team-nexus-members) for COM727 Introduction to AI, MSc Applied AI and
+Data Science, Southampton Solent University.
 
 **Live application:** _pending deployment_
 
@@ -12,13 +19,15 @@ Group project by [Team Nexus](#team-nexus-members) for COM727 Introduction to AI
 
 ## Contents
 
-- [What it does](#what-it-does)
+- [The task](#the-task)
+- [What the application does](#what-the-application-does)
 - [Architecture](#architecture)
 - [Repository layout](#repository-layout)
 - [Installation](#installation)
 - [Reproducing the results](#reproducing-the-results)
 - [Running the application](#running-the-application)
 - [Results](#results)
+- [The optional question feature](#the-optional-question-feature)
 - [Limitations](#limitations)
 - [Team Nexus Members](#team-nexus-members)
 - [References](#references)
@@ -26,49 +35,77 @@ Group project by [Team Nexus](#team-nexus-members) for COM727 Introduction to AI
 
 ---
 
-## What it does
+## The task
 
-Enter a description of a person using the fields available in the UCI Adult census dataset. The
-application returns three things.
+**Binary classification.** Given the demographic and employment attributes recorded for one person by
+the 1994 US Census, predict which of two income brackets they fall into.
 
-**A decision band.** The predicted probability of the upper income bracket is mapped onto one of three
-bands: confidently below the threshold, confidently above it, or an uncertain middle band where the
-case is escalated to a human rather than decided automatically. This is the accept, refer, decline
-pattern used in credit screening. The boundaries were selected from validation evidence, not chosen
-for neatness.
+| | |
+| --- | --- |
+| One input sample | Thirteen attributes: age, education, years of education, occupation, employer type, hours worked per week, marital status, household role, sex, race, country of birth, capital gains, capital losses |
+| Output class 1 | **Upper bracket**, annual income over $50,000 |
+| Output class 2 | **Lower bracket**, annual income of $50,000 or under |
+| Selected classifier | **XGBoost**, chosen from eight candidates on validation F1 |
+| Interface | The **Assessment tab** of the Streamlit application, which sends a new sample to the saved classifier |
 
-**An explanation.** Every attribute's exact contribution to the prediction, measured in log odds. The
-contributions and the model's baseline sum to the raw output, and converting that sum reproduces the
-predicted probability precisely, so the explanation can be checked rather than trusted.
+**How the data is used.**
 
-**Answers.** A separate trained classifier recognises which of thirty eight questions was asked and
-composes a reply. Answers about the current assessment are assembled from live model output, so
-changing the person changes both the wording and the figures.
+| Split | Records | Role |
+| --- | ---: | --- |
+| Training | 26,048 | The eight candidate models are fitted on these rows only |
+| Validation | 6,513 | Model selection, decision band boundaries, calibration check |
+| Official test (`adult.test`) | 16,281 | Untouched until every choice was final, then used once |
 
-The application is a demonstration of a decision support pattern. It is not a lending tool. See
-[Limitations](#limitations).
+Model selection used validation data. Final performance used the official test file, which played no
+part in choosing the algorithm, the hyperparameters or the band boundaries.
+
+All preparation rules, meaning the rare-country grouping, the one-hot category levels and the scaling
+values, are fitted on the training rows only and then applied unchanged to validation and test.
+
+---
+
+## What the application does
+
+Enter a description of a person on the Assessment tab. The application returns three things.
+
+**A predicted bracket.** The saved XGBoost model returns the probability that the person is in the
+upper bracket. Above 50 percent the answer is the upper bracket; below it, the lower bracket.
+
+**A decision band.** That probability is mapped onto one of three bands: confidently below the
+threshold, confidently above it, or an uncertain middle band where the case is escalated to a human
+rather than decided automatically. This is the accept, refer, decline pattern used in credit
+screening. The boundaries were selected from validation evidence and then checked once on the official
+test file.
+
+**An explanation.** Every attribute's exact contribution to the prediction, measured in log odds and
+translated into plain language. The contributions and the model's baseline sum to the raw output, and
+converting that sum reproduces the predicted probability precisely, so the explanation can be checked
+rather than trusted.
+
+The application also carries an optional question and answer feature, described
+[below](#the-optional-question-feature). It plays no part in predicting income.
 
 ---
 
 ## Architecture
 
-Two trained models do different jobs.
-
-| | Income classifier | Intent classifier |
-| --- | --- | --- |
-| Algorithm | XGBoost | Multinomial Naive Bayes |
-| Trained on | 26,048 census records | 305 authored question phrasings |
-| Predicts | Which side of the income threshold | Which of 38 questions was asked |
-| Explained by | TreeSHAP contributions | Confidence with a fallback threshold |
-| Artefacts | `income_model.json`, `preprocessing.joblib` | `intent_model.joblib` |
-
 Training and inference are separate. Model fitting happens offline in `src/train.py`, which writes
 artefacts to `models/`. The application loads those artefacts and never fits a model, so a deployed
 instance starts quickly and always reproduces the figures reported here.
 
-No result is written into application code or into the authored responses. Every figure the interface
-states is read from a generated file at the moment it is displayed, so retraining changes what the
-application says.
+```
+adult.data  ──►  split  ──►  fit preparation on training rows  ──►  fit XGBoost
+                                          │                              │
+                                          ▼                              ▼
+                             models/preprocessing.joblib     models/income_model.json
+                                          │                              │
+                                          └────────────┬─────────────────┘
+                                                       ▼
+                              Streamlit Assessment tab: new sample ──► prediction
+```
+
+No result is written into application code. Every figure the interface states is read from a generated
+file at the moment it is displayed, so retraining changes what the application says.
 
 ---
 
@@ -81,25 +118,25 @@ requirements.txt              Runtime dependencies, installed on the deployment 
 requirements-dev.txt          Adds notebook and testing tools for local work
 
 data/
-  intents.json                Conversational training data and the interface question set
   raw/                        Original UCI Adult files
+  intents.json                Question set for the optional feature
 
 notebooks/
-  01_analysis_and_modeling.ipynb    Exploration, eight model comparison, calibration,
-                                    band selection, intent evaluation
+  01_analysis_and_modeling.ipynb    EDA, eight model comparison, evaluation,
+                                    calibration, band selection
 
 src/
-  config.py                   Paths, column groupings, constants
+  config.py                   Paths, column groupings, constants, random seed
   data.py                     Loading and feature preparation, shared with the notebook
-  train.py                    Fits both models and writes every artefact
-  predict.py                  Loads artefacts and scores one person
+  train.py                    Fits the classifier and writes every artefact
+  predict.py                  Loads artefacts and scores one new sample
   explain.py                  TreeSHAP contributions grouped by attribute
   decision.py                 Probability to decision band
-  nlp.py                      Tokenise, lemmatise, bag of words
   fairness.py                 Counterfactual, removal and proxy recovery audit
+  nlp.py                      Text preprocessing, optional feature only
   chatbot/
     limitations.py            Standing limitations text, composed from generated figures
-    engine.py                 Intent routing and response composition
+    engine.py                 Question routing, optional feature only
 
 models/                       Generated artefacts and result files, committed
 outputs/                      Generated figures, not committed
@@ -111,8 +148,8 @@ tests/
 
 ## Installation
 
-Requires **Python 3.12 or later**. Develop on the same version you intend to deploy, because the
-deployed Python version cannot be changed without recreating the application.
+Requires **Python 3.12 or later**. Developed on 3.13. Use the same version you intend to deploy,
+because the deployed Python version cannot be changed without recreating the application.
 
 ```bash
 git clone <repository-url>
@@ -140,14 +177,30 @@ running from the repository root.
 `python src/train.py`. Running a file directly puts that file's own folder on the import path instead
 of the repository root, and the imports fail.
 
+### Language resources, needed only by the optional feature
+
+The optional question and answer feature uses NLTK, which does not ship its corpora with the package.
+Three are downloaded on first use: `wordnet`, `omw-1.4` and `stopwords`. This happens automatically
+inside a cached function, takes a few seconds and requires network access.
+
+**The required classifier does not depend on this.** If the download is blocked, the Assessment, Why
+and Model tabs work normally and the optional tab reports that it is unavailable. To fetch the corpora
+in advance, or to test whether your network permits it:
+
+```bash
+python -c "import nltk; print(nltk.download('wordnet'), nltk.download('omw-1.4'), nltk.download('stopwords'))"
+```
+
+Three `True` values means the resources are available.
+
 ---
 
 ## Reproducing the results
 
-Three commands, in order. Everything is deterministic: the random seed is fixed in `src/config.py`
-and both models are fitted on the same split every time.
+Everything is deterministic: the random seed is fixed in `src/config.py` and the models are fitted on
+the same split every time.
 
-### 1. Train both models
+### 1. Train
 
 ```bash
 python -m src.train
@@ -159,17 +212,15 @@ Expected output:
 Income classifier
   train 26048  validation 6513  held-out test 16281  features 61
   split             accuracy  precision   recall       f1   roc_auc
+  training            0.8903     0.8207   0.6966   0.7536    0.9482
   validation          0.8747     0.7789   0.6696   0.7202    0.9314
   held_out_test       0.8723     0.7696   0.6557   0.7081    0.9273
-
-Intent classifier
-  38 intents, 305 patterns, 323 words after preprocessing
-  alpha 0.3  binary presence True
-  display strings resolving correctly 100.0%
-  confidence on buttons: lowest 0.116, median 0.830
+  held-out test: 2522 upper-bracket found, 1324 missed, 755 wrongly flagged,
+                 11680 lower-bracket correct
 ```
 
-Writes `income_model.json`, `preprocessing.joblib`, `metadata.json` and `intent_model.joblib`.
+Writes `income_model.json`, `preprocessing.joblib` and `metadata.json`, and also fits the optional
+question classifier to `intent_model.joblib`.
 
 If the numbers differ, something upstream has changed. Check the seed, the split proportion and the
 hyperparameters in `src/train.py` before continuing.
@@ -189,9 +240,12 @@ from the other columns at 84.6 percent against a 66.9 percent baseline.
 ### 3. Run the notebook
 
 Open `notebooks/01_analysis_and_modeling.ipynb`, restart the kernel and run all cells. This produces
-the eight model comparison, the calibration check, the decision band selection and the intent
-evaluation, writing `model_comparison.csv`, `val_vs_test_all_models.csv`, `decision_thresholds.json`
-and `intent_metrics.json`, along with the figures in `outputs/`.
+the exploratory analysis, the eight model comparison with confusion matrices, the training against
+validation against test check, the calibration measurement, the decision band selection and its
+verification on the official test file.
+
+It writes `model_comparison.csv`, `val_vs_test_all_models.csv`, `train_val_test_all_models.csv`,
+`decision_thresholds.json` and `intent_metrics.json`, along with the figures in `outputs/`.
 
 The notebook imports its data loading and preparation from `src.data`, so the notebook and the
 application encode features identically by construction rather than by agreement.
@@ -218,58 +272,105 @@ unnoticed.
 streamlit run streamlit_app.py
 ```
 
-Opens at `http://localhost:8501`. Run it from the repository root; Streamlit resolves paths relative
-to the root both locally and when deployed.
+Opens at `http://localhost:8501`. Run it from the repository root; Streamlit resolves paths relative to
+the root both locally and when deployed. The committed artefacts mean the application runs without
+retraining.
 
-Four tabs:
+**Assessment** is the required classifier interface. Enter a new sample and it returns the predicted
+bracket, the probability, the decision band and the recommended action. Every field is a dropdown
+restricted to values present in the training data, or a number input bounded by the range observed
+there, so an impossible sample cannot be submitted. Fields whose value matches the training default
+are listed with the result, because a default is an assumption rather than a blank.
 
-**Assessment** enters a person and returns the band, the probability and the recommended action. Every
-field is a dropdown restricted to values present in the training data, or a number input bounded by
-the range observed there. Fields left at their training default are listed with the result, because a
-default is an assumption rather than a blank.
+**Why** shows the contribution of each attribute as a diverging bar chart with a plain language
+translation, and a collapsed technical panel demonstrating that the contributions reconstruct the
+model output exactly.
 
-**Why** shows the contribution of each attribute as a diverging bar chart, with the arithmetic
-underneath demonstrating that the contributions reconstruct the model output exactly.
-
-**Ask** offers the thirty eight questions as buttons grouped by topic. Each button sends its question
-text through the intent classifier exactly as typed input would arrive, and every answer carries a
-panel showing which intent was recognised and with what confidence.
+**Ask (optional)** is described below.
 
 **Model and limitations** reports the eight algorithm comparison, the band selection evidence, the
-conversational model's own evaluation, the fairness audit, and the limitations in full.
-
-On first run the application downloads three NLTK corpora. This happens once, inside a cached
-function, and takes a few seconds.
+fairness audit and the limitations in full.
 
 ---
 
 ## Results
 
-Metrics are written by the scripts that compute them and are not transcribed anywhere by hand.
+Metrics are written by the scripts that compute them and are not transcribed anywhere by hand. Every
+figure states which split it measures.
 
 | File | Contains |
 | --- | --- |
-| `models/metadata.json` | Income model metrics, hyperparameters, row counts, library versions |
+| `models/metadata.json` | Training, validation and test metrics, confusion matrix, hyperparameters, row counts, library versions |
 | `models/model_comparison.csv` | Validation metrics for all eight algorithms |
-| `models/val_vs_test_all_models.csv` | Validation against held-out test for all eight |
-| `models/decision_thresholds.json` | Band boundaries, referral rate, calibration, band outcome rates |
-| `models/intent_metrics.json` | Per intent precision, recall and F1, confusion pairs, threshold |
+| `models/val_vs_test_all_models.csv` | Validation against official test for all eight |
+| `models/train_val_test_all_models.csv` | All three splits for all eight, with the train minus test gap |
+| `models/decision_thresholds.json` | Band boundaries, calibration, and band results on both validation and official test |
 | `models/fairness_report.json` | Group rates, counterfactuals, removal test, proxy recovery |
+| `models/intent_metrics.json` | Optional feature only, reported separately |
 
-Headline figures, all reproducible from the commands above:
+### The selected classifier
 
-- Held-out accuracy 0.8723, F1 0.7081, ROC-AUC 0.9273 on 16,281 records never seen in training
-- Referral band 0.30 to 0.70, referring 17.8 percent of cases and raising accuracy on the automated
-  remainder from 0.8747 to 0.9359
-- Brier score 0.0863 and expected calibration error 0.0061, so the probabilities can be read as
-  probabilities
-- Intent classifier: 100 percent on the thirty eight held-out button phrasings, 38.4 percent
-  cross validated across all authored phrasings
+| Split | Accuracy | Precision | Recall | F1 | ROC-AUC |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Training | 0.8903 | 0.8207 | 0.6966 | 0.7536 | 0.9482 |
+| Validation | 0.8747 | 0.7789 | 0.6696 | 0.7202 | 0.9314 |
+| Official test | 0.8723 | 0.7696 | 0.6557 | 0.7081 | 0.9273 |
 
-The two intent figures measure different things and both are reported. The first covers the wordings
-the interface actually produces, none of which appeared in training. The second is cross validated
-over all 305 phrasings and is far lower, because thirty eight closely related intents with eight
-examples each is a hard problem. Free text input is not offered, which is one reason why.
+The gap between training and official test accuracy is 1.8 percentage points, so overfitting is
+limited.
+
+### Reading the errors
+
+On the official test file the model finds 2,522 of the 3,846 people genuinely in the upper bracket and
+misses 1,324 of them, and it wrongly flags 755 people as upper bracket. That is recall of 65.6
+percent: **about one in three qualifying people is missed**, despite overall accuracy of 87.2 percent.
+
+Accuracy flatters the model because the classes are imbalanced. Only 24.1 percent of records are in
+the upper bracket, so predicting the lower bracket for everybody would score 75.9 percent without
+learning anything. Recall is lower than precision because the upper bracket is the minority class, the
+default 0.5 threshold favours the majority on an imbalanced problem, and the two groups genuinely
+overlap in this data. The decision band is the direct response to that overlap.
+
+### The decision bands
+
+| Measure | Validation | Official test |
+| --- | ---: | ---: |
+| Referral rate | 17.80% | 17.72% |
+| Accuracy on automated cases | 93.59% | 92.95% |
+| Actual upper-bracket rate inside the band | 47.63% | 46.76% |
+
+The boundaries of 0.30 and 0.70 were selected on validation and applied once to the official test
+file. The near identical figures indicate they describe a property of the model rather than of the
+split they were tuned on. The Brier score is 0.0863 and the expected calibration error 0.0061, both
+measured on validation, so the probabilities can be read as probabilities rather than only as a
+ranking.
+
+---
+
+## The optional question feature
+
+The **Ask (optional)** tab is an additional help feature, not the required classifier interface. It
+does not predict income and can be removed without affecting the classifier or the Assessment tab.
+
+It offers thirty eight questions as buttons grouped by topic. Rather than mapping each button directly
+to stored text, the button sends its question wording to a separate Multinomial Naive Bayes classifier
+trained on 305 hand written phrasings, which recognises the intent and composes an answer. Answers
+about the current assessment are assembled from live model output, so changing the person changes both
+the wording and the figures. Every answer carries a panel showing which intent was recognised and with
+what confidence.
+
+Its results are reported separately from the classifier results and are not mixed with them:
+
+| Measure | Value |
+| --- | ---: |
+| Accuracy on the thirty eight button wordings, held out of training | 100% |
+| Cross validated accuracy across all 305 authored phrasings | 38.4% |
+| Macro F1 across thirty eight intents | 0.380 |
+
+The two figures measure different things. The first covers the wordings the interface actually
+produces, none of which appeared in training. The second is far lower because thirty eight closely
+related intents with eight examples each is a hard problem. Free text input is not offered, which is
+one reason why. Full detail is in `models/intent_metrics.json`.
 
 ---
 
@@ -286,14 +387,22 @@ retired from fairness research for this reason.
 predicts which side of a threshold a person falls on, and the bands describe confidence in that
 prediction rather than income tiers.
 
-**Outcomes differ by sex.** On the held-out file the model predicts the upper bracket for 26.0 percent
-of men and 8.4 percent of women. Among people who genuinely are above the threshold it identifies 66.5
-percent of men and 60.3 percent of women, so the disparity is in error as well as in outcome.
+**The model is wrong regularly.** It misses about one in three people who genuinely are in the upper
+bracket, as set out above.
+
+**Outcomes differ by sex.** On the official test file the model predicts the upper bracket for 26.0
+percent of men and 8.4 percent of women, where the actual rates in the data are 30.0 and 10.9 percent.
+Among people who genuinely are above the threshold it identifies 66.5 percent of men and 60.3 percent
+of women, so the disparity appears in error as well as in outcome.
 
 **Removing protected attributes does not fix it.** Retraining without sex, race and country of birth
 closes about nine percent of the gap while barely changing accuracy, because other columns carry the
 same information. A classifier recovers sex from the remaining features at 84.6 percent, and still at
 79.7 percent once the household role column is removed as well.
+
+These are observed differences that warrant investigation. They are evidence of disparate outcome, and
+they identify a mechanism, but they do not by themselves establish every cause, and nothing here is a
+finding of unlawful discrimination.
 
 **It must not be used to decide about real people.** Applying a system of this kind to lending,
 employment or housing would raise indirect discrimination questions under sections 19 and 29 of the
@@ -342,7 +451,7 @@ Thomas, L., Edelman, D. and Crook, J. (2002) *Credit Scoring and Its Application
 
 ## Licence
 
-Source code released under the MIT Licence, as recorded in `LICENSE`.
+Source code released under the GNU General Public Licence, as recorded in `LICENSE`.
 
 The UCI Adult dataset is distributed by the UCI Machine Learning Repository under a Creative Commons
 Attribution 4.0 International licence.
