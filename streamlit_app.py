@@ -1,13 +1,14 @@
-"""Income bracket decision support chatbot.
+"""Nexus Income Bracket Chatbot.
 
 Run from the repository root with ``streamlit run streamlit_app.py``.
 
-The interface loads artefacts written by ``src.train`` and never fits a model.
-Artefact loading is cached so it happens once per session rather than on every
-widget interaction, since Streamlit re-executes this script top to bottom each
-time the user touches anything.
+The interface loads the artefacts written by ``src.train`` and does not fit a
+model. Loading is cached, since Streamlit re-executes this script from top to
+bottom on every widget interaction.
 
-Sections marked below are filled in by later phases.
+The Assessment tab is the classifier interface: it collects one new sample,
+applies the saved preparation and reports the prediction. The Ask tab is an
+optional extension and takes no part in predicting income.
 """
 
 import html
@@ -34,9 +35,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# The interface uses a single light palette. Text colour is never set inline, so
-# every label follows the theme Streamlit is rendering and cannot end up dark on
-# dark or pale on white.
+# A single light palette. Text colour is not set inline, so every label follows
+# the theme Streamlit renders.
 COLOURS = {
     "surface": "#F1F4F7",
     "accent": "#1B3A5C",
@@ -53,16 +53,14 @@ COLOURS = {
 
 @st.cache_resource(show_spinner="Loading the trained models")
 def startup():
-    """Load the income classifier and, if it is available, the optional chat layer.
+    """Load the classifier artefacts and, where available, the optional chat layer.
 
-    The income classifier is the required part of this system, so it is loaded
-    first and never depends on anything optional. The conversational layer needs
-    language corpora that are downloaded on first use rather than shipped with
-    the package, and a blocked download must not be able to prevent an
-    assessment. Its failure is recorded and reported rather than raised.
+    The classifier is loaded first and does not depend on anything optional. The
+    conversational layer needs NLTK corpora fetched on first use, so a failed
+    download is recorded and returned rather than raised.
 
-    Cached as a resource because these objects are shared across sessions and
-    are not serialisable in any useful sense.
+    Cached as a resource: the objects are shared across sessions and are not
+    usefully serialisable.
     """
     artefacts = load_artefacts()
     load_thresholds()
@@ -92,10 +90,9 @@ def initialise_state():
 def robot():
     """Return the mascot as an SVG string.
 
-    Drawn rather than loaded so it needs no asset file and scales cleanly. It is
-    handed to ``st.image`` rather than to ``st.markdown``: markdown strips svg
-    elements during sanitising, which leaves only the loose text inside them.
-    Motion is dropped for anyone who has asked their system to reduce it.
+    Drawn rather than loaded, so no asset file is required. Passed to
+    ``st.image``: ``st.markdown`` strips svg elements when sanitising. Animation
+    is suppressed under ``prefers-reduced-motion``.
     """
     colours = COLOURS
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
@@ -195,15 +192,14 @@ def show_warnings(warnings):
         )
 
 
-# A bare dollar sign starts LaTeX maths in Streamlit markdown, which swallows the
-# text between two of them. Escaping keeps the symbol literal.
+# A bare dollar sign starts LaTeX maths in Streamlit markdown. Escaping keeps the
+# symbol literal.
 UPPER_LABEL = r"Upper bracket, over \$50,000"
 LOWER_LABEL = r"Lower bracket, \$50,000 or under"
 
-# Bands are named by what the model concluded, not by an action taken against a
-# person. Calling them accept and reject would claim the system makes lending
-# decisions, which is exactly what the limitations panel says it must not do.
-# The credit screening analogy is named once in prose beneath instead.
+# Bands are named by what the model concluded rather than by an action taken
+# against a person. The accept, refer and decline analogy is named once in prose
+# beneath the bar instead.
 BAND_STYLE = {
     "below": {
         "heading": "Lower bracket",
@@ -280,15 +276,11 @@ def tint(hex_colour, alpha):
 
 
 def band_strip(probability, band):
-    """Draw the three bands as one bar, marking where this person falls.
+    """Draw the three bands as one bar, marking where the case falls.
 
-    Makes the routing visible rather than implied. The reader can see that the
-    system has three outcomes, where the boundaries sit, and which side of them
-    this case landed on.
-
-    Inactive segments keep their colour as text on a pale tint rather than being
-    faded out, because a faded segment on a white page loses its edges and the
-    reader can no longer see that three bands exist.
+    Segment widths follow the real boundaries. Inactive segments are drawn as
+    coloured text on a pale tint rather than faded, which keeps their edges
+    visible on a light background.
     """
     thresholds = load_thresholds()
     low, high = thresholds["lower"], thresholds["upper"]
@@ -336,10 +328,10 @@ def band_strip(probability, band):
 
 
 def leaning_sentence(probability, band):
-    """Say in one line what the binary prediction is and how firmly it is held.
+    """Return one line stating the predicted class and how firmly it is held.
 
-    The percentage is formatted so that a very small probability does not round
-    to zero, which would read as an impossibility rather than as a small number.
+    Very small probabilities are formatted as a bound rather than rounded to
+    zero.
     """
     if band == "referral":
         leaning = "upper" if probability >= 0.5 else "lower"
@@ -357,9 +349,8 @@ def leaning_sentence(probability, band):
 def result_banner(name, colour):
     """Draw the centred heading that opens the result.
 
-    The name is user supplied and is inserted into markup, so it is escaped
-    first. Without this, text typed into the name field would be rendered as
-    HTML rather than displayed as characters.
+    The name is user supplied and inserted into markup, so it is escaped before
+    display.
     """
     st.markdown(
         f"<div style='background:{colour};border-radius:6px;padding:0.55rem 1rem;"
@@ -371,7 +362,7 @@ def result_banner(name, colour):
 
 
 def probability_card(probability, colour):
-    """Show the figure the whole result turns on, at a size that reads across a room."""
+    """Show the predicted probability at display size."""
     st.markdown(
         f"<div style='border:1px solid {tint(colour, 0.35)};border-radius:6px;"
         f"background:{tint(colour, 0.08)};padding:1.1rem 1rem;text-align:center;"
@@ -499,12 +490,9 @@ def assessment_tab():
 def odds_phrase(contribution):
     """Translate a log odds contribution into everyday language.
 
-    Exponentiating the contribution gives the factor it multiplies the odds by,
-    which is the same figure without requiring anyone to know what a log odd is.
-    The wording leads with direction and strength so a reader who wants only the
-    gist can stop after three words, and the multiplier follows for anyone who
-    wants the size. The word odds is avoided, since it is the term a non
-    technical reader stumbles on.
+    Exponentiating the contribution gives the factor by which it multiplies the
+    odds. The wording leads with direction and strength, then the multiplier.
+    Contributions within 0.05 of zero are reported as no real effect.
     """
     size = abs(float(contribution))
 
@@ -520,7 +508,7 @@ def odds_phrase(contribution):
 
 
 def number_glossary():
-    """Explain the figures on this page for a reader who does not work with them."""
+    """Return a plain language glossary of the figures used on this page."""
     st.markdown(
         """
 | Term | What it means in plain English |
@@ -548,9 +536,8 @@ AWAY_COLOUR = "#B5533C"
 def format_attribute_value(value):
     """Return an attribute value as text.
 
-    The column mixes whole numbers with category names, which cannot be handed
-    to the table renderer as it stands, and a whole number should not gain a
-    decimal point on the way to the screen.
+    The column mixes numbers with category names, which the table renderer
+    cannot serialise, and whole numbers are kept whole.
     """
     if isinstance(value, (int, float, np.integer, np.floating)):
         number = float(value)
@@ -741,11 +728,10 @@ def question_panel(grouped, ready):
 
 
 def conversation_tab(chat_available, chat_error):
-    """Ask questions about the assessment, the model and the data.
+    """Optional question and answer tab.
 
-    This is an optional extension rather than part of the required classifier
-    interface. If its language resources are unavailable it reports that and
-    stops, leaving the assessment and explanation tabs working.
+    Not part of the classifier interface. If the language resources are
+    unavailable it reports that and returns, leaving the other tabs working.
     """
     if not chat_available:
         st.warning(
