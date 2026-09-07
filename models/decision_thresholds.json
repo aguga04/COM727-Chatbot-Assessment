@@ -88,5 +88,15 @@
         "gap": -0.000266135524917388
       }
     ]
+  },
+  "held_out_test": {
+    "referral_rate": 0.1772004176647626,
+    "automated_accuracy": 0.9295312033442819,
+    "referred_accuracy": 0.6065857885615251,
+    "band_actual_rates": {
+      "below": 0.06218664790219017,
+      "referred": 0.46759098786828424,
+      "above": 0.8830784410458806
+    }
   }
 }
