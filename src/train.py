@@ -28,8 +28,8 @@ import joblib
 import numpy as np
 import sklearn
 import xgboost as xgb
-from sklearn.metrics import (accuracy_score, precision_score, recall_score,
-                             f1_score, roc_auc_score)
+from sklearn.metrics import (accuracy_score, confusion_matrix, precision_score,
+                             recall_score, f1_score, roc_auc_score)
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.preprocessing import StandardScaler
@@ -79,19 +79,26 @@ def train_income():
     """Fit the income classifier and write its artefacts to disk."""
     config.MODELS.mkdir(exist_ok=True)
 
-    train_raw, test_raw = load_raw()
+    train_raw_all, test_raw = load_raw()
 
-    X, schema = prepare_features(train_raw)
-    X_test, _ = prepare_features(test_raw, schema)
-    y = extract_target(train_raw)
-    y_test = extract_target(test_raw)
-
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y,
+    # The raw records are split before any preparation rule is fitted. Rare
+    # country grouping and the one hot category levels are learned from the
+    # training rows alone and then reapplied unchanged, so validation rows
+    # cannot influence the structure of the encoding.
+    train_raw, val_raw = train_test_split(
+        train_raw_all,
         test_size=VALIDATION_SIZE,
         random_state=config.RANDOM_STATE,
-        stratify=y,
+        stratify=extract_target(train_raw_all),
     )
+
+    X_train, schema = prepare_features(train_raw)
+    X_val, _ = prepare_features(val_raw, schema)
+    X_test, _ = prepare_features(test_raw, schema)
+
+    y_train = extract_target(train_raw)
+    y_val = extract_target(val_raw)
+    y_test = extract_target(test_raw)
 
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
@@ -101,9 +108,11 @@ def train_income():
     model = xgb.XGBClassifier(**MODEL_PARAMS)
     model.fit(X_train_scaled, y_train)
 
+    training_metrics = evaluate(model, X_train_scaled, y_train)
     validation_metrics = evaluate(model, X_val_scaled, y_val)
     test_metrics = evaluate(model, X_test_scaled, y_test)
 
+    # Fitted on the training rows only, for the same reason as everything else.
     defaults = compute_defaults(train_raw)
 
     model.get_booster().save_model(config.MODELS / "income_model.json")
@@ -124,9 +133,13 @@ def train_income():
             "validation": int(X_val.shape[0]),
             "held_out_test": int(X_test.shape[0]),
         },
-        "feature_count": int(X.shape[1]),
-        "positive_class_share_full_training_file": float(y.mean()),
-        "metrics": {"validation": validation_metrics, "held_out_test": test_metrics},
+        "feature_count": int(X_train.shape[1]),
+        "positive_class_share_training_split": float(y_train.mean()),
+        "confusion_matrix_held_out_test": confusion_matrix(
+            y_test, model.predict(X_test_scaled)).tolist(),
+        "metrics": {"training": training_metrics,
+                    "validation": validation_metrics,
+                    "held_out_test": test_metrics},
         "versions": {
             "python": platform.python_version(),
             "xgboost": xgb.__version__,
@@ -234,6 +247,11 @@ def report_income(metadata):
               f"{scores['recall']:>9.4f}"
               f"{scores['f1']:>9.4f}"
               f"{scores['roc_auc']:>10.4f}")
+
+    (true_lower, false_upper), (missed_upper, found_upper) = \
+        metadata["confusion_matrix_held_out_test"]
+    print(f"  held-out test: {found_upper} upper-bracket found, {missed_upper} missed, "
+          f"{false_upper} wrongly flagged, {true_lower} lower-bracket correct")
 
 
 def report_intents(artefact):
