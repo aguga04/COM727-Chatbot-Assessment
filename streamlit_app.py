@@ -167,15 +167,24 @@ def header(metadata):
         help="Of the people who genuinely are above the threshold, this share is "
              "correctly identified. The rest are missed.")
     rows = metadata["rows"]
-    thousands = lambda value: f"{round(value / 1000):,}k"
+    def thousands(value):
+        """Return a row count in thousands, to one decimal where rounding would mislead.
+
+        6,513 shown as 7k overstates it by seven percent, so it keeps a decimal.
+        16,281 shown as 16k is under two percent out and stays whole, which keeps
+        the string short enough to survive a narrow window.
+        """
+        scaled = value / 1000
+        rounded = round(scaled)
+        return f"{rounded:.0f}k" if abs(scaled - rounded) / scaled < 0.05 else f"{scaled:.1f}k"
     columns[2].metric(
         "Train / val / test",
         " / ".join(thousands(rows[key]) for key in
                    ("train", "validation", "held_out_test")),
         help=f"{rows['train']:,} training records, {rows['validation']:,} for "
              f"validation and {rows['held_out_test']:,} held back for final testing. "
-             "The held-back records were never seen during training, so the accuracy "
-             "shown here is not flattered by memorisation.")
+             "The held-back records were never seen during training or model "
+             "selection, so the accuracy shown here is not flattered by memorisation.")
     columns[3].metric(
         "Attributes used", metadata["feature_count"],
         help="Thirteen real world attributes become this many numeric columns once "
@@ -838,20 +847,22 @@ def decision_band_summary():
 
     columns = st.columns(4)
     columns[0].metric(
-        "Referred to a person", f"{evidence['referral_rate']:.1%}",
+        "Referred to a person (validation)", f"{evidence['referral_rate']:.1%}",
         help="Share of cases the model declines to decide, sending them to a human "
              "assessor instead.")
     columns[1].metric(
-        "Accuracy when automated", f"{evidence['automated_accuracy']:.1%}",
+        "Accuracy when automated (validation)",
+        f"{evidence['automated_accuracy']:.1%}",
         f"{evidence['accuracy_gain']:+.1%}",
         help="Accuracy on the cases that are decided automatically. The change shown "
              "is the improvement over deciding everything with a single cut off.")
     columns[2].metric(
-        "Brier score", f"{evidence['brier_score']:.4f}",
+        "Brier score (validation)", f"{evidence['brier_score']:.4f}",
         help="How honest the percentages are. Zero is perfect. Always predicting "
              "fifty percent would score 0.25.")
     columns[3].metric(
-        "Calibration error", f"{evidence['expected_calibration_error']:.4f}",
+        "Calibration error (validation)",
+        f"{evidence['expected_calibration_error']:.4f}",
         help="Average gap between what the model predicted and what actually "
              "happened. Small means a stated seventy percent behaves like seventy "
              "percent.")
@@ -879,11 +890,12 @@ def conversational_summary(intent_metrics):
         "Training phrasings", intent_metrics["patterns"],
         help="Hand written example wordings the classifier learned from.")
     columns[2].metric(
-        "Button accuracy", f"{intent_metrics['display_accuracy']:.0%}",
+        "Button accuracy (held out)", f"{intent_metrics['display_accuracy']:.0%}",
         help="Share of the question buttons that reach the right answer. None of "
              "those wordings appeared in training.")
     columns[3].metric(
-        "Unseen phrasing accuracy", f"{intent_metrics['out_of_fold_accuracy']:.0%}",
+        "Unseen phrasing (cross validated)",
+        f"{intent_metrics['out_of_fold_accuracy']:.0%}",
         help="How often an arbitrary rewording reaches the right intent. Much lower, "
              "because the questions are numerous and similar to each other.")
 
@@ -914,14 +926,14 @@ def fairness_summary(fairness):
 
     columns = st.columns(3)
     columns[0].metric(
-        "Predicted upper bracket, men against women",
+        "Upper bracket predicted, men / women (held out)",
         f"{rates['Male']['selection_rate']:.1%} / {rates['Female']['selection_rate']:.1%}")
     columns[1].metric(
-        "Predictions changed by reversing sex alone",
+        "Predictions changed by reversing sex (held out)",
         f"{flip['predictions_changed']:,}",
         f"{flip['share_changed']:.2%} of the held-out file")
     columns[2].metric(
-        "Sex recovered from the other columns",
+        "Sex recovered from other columns (validation)",
         f"{proxy['household_role_present']['accuracy']:.1%}",
         f"baseline {proxy['majority_class_baseline']:.1%}")
 
