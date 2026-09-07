@@ -51,7 +51,6 @@ def figures():
         "referral_rate": f"{thresholds['referral_rate']:.1%}",
         "automated_accuracy": f"{thresholds['automated_accuracy']:.1%}",
         "referred_accuracy": f"{thresholds['referred_accuracy']:.1%}",
-        "referred_actual_rate": f"{thresholds['band_actual_rates']['referred']:.1%}",
         "male_selection": f"{rates['Male']['selection_rate']:.1%}",
         "female_selection": f"{rates['Female']['selection_rate']:.1%}",
         "male_actual": f"{rates['Male']['actual_rate']:.1%}",
@@ -112,10 +111,8 @@ SECTIONS = [
             "figure from which such an estimate could be made. The three bands are confidence "
             "bands about which side of the threshold a person falls, not low, middle and high "
             "income tiers. A result in the referral band between {lower} and {upper} means the "
-            "model cannot separate the case. Records that land there split almost "
-            "evenly, {referred_actual_rate} of them genuinely above the threshold, "
-            "and the model is only {referred_accuracy} accurate on them, which is "
-            "close to chance. That is why those cases are escalated to a person "
+            "model cannot separate the case: within that band it is only {referred_accuracy} "
+            "accurate, close to chance, which is why those cases are escalated to a person "
             "instead of decided automatically."
         ),
     },
@@ -171,14 +168,14 @@ SECTIONS = [
     },
     {
         "key": "defaults",
-        "heading": "Unanswered fields still affect the result",
+        "heading": "Fields left at their default still affect the result",
         "template": (
-            "The form does not ask for all thirteen attributes. Anything left blank is filled "
-            "with the training median or mode, and those filled values contribute to the "
-            "prediction like any other. Capital gains is the clearest case: its default is zero, "
-            "zero is informative to the model, and it pushes the prediction away from the upper "
-            "bracket. The fields that were defaulted are listed with every result so that a "
-            "partial profile is never mistaken for a complete one."
+            "Four of the thirteen attributes sit in an optional section of the form, pre-filled "
+            "with the training median or mode. A value left at that default contributes to the "
+            "prediction exactly as an answered one does. Capital gains is the clearest case: its "
+            "default is zero, zero is informative to the model, and it pushes the prediction away "
+            "from the upper bracket. Any field whose value matches the training default is listed "
+            "with the result, so an unexamined profile is not mistaken for a considered one."
         ),
     },
     {
@@ -191,7 +188,12 @@ SECTIONS = [
             "29 of the Equality Act 2010, and the evidence above indicates it would not withstand "
             "that scrutiny. The referral band exists so that cases the model cannot separate reach "
             "a person rather than an automated verdict, but that safeguard does not make the "
-            "underlying disparities acceptable."
+            "underlying disparities acceptable.\n\n"
+            "The figures above are observed differences that warrant investigation, and the "
+            "proxy experiment identifies a mechanism behind them. They do not by themselves "
+            "establish every cause, and none of this is a finding of unlawful discrimination. "
+            "The age of the data and the presence of protected attributes are sufficient on "
+            "their own to rule the model out for real decisions."
         ),
     },
 ]

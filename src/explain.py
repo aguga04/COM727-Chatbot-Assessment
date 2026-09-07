@@ -8,15 +8,13 @@ term, and those values sum to the raw margin. For a binary logistic objective
 the raw margin is the log odds, so applying the sigmoid to the sum reproduces
 the predicted probability exactly.
 
-Contributions are therefore expressed in LOG ODDS. They are not percentages and
-not amounts of money. A contribution of plus 0.8 means the attribute added 0.8
-to the log odds, not that it added eighty percent to anything. Any interface
-displaying these values must label the unit.
+Contributions are expressed in log odds. They are not percentages and not
+amounts of money: a contribution of 0.8 adds 0.8 to the log odds. Any interface
+displaying these values labels the unit.
 
-One hot encoding splits a single real world attribute across many columns, only
-one of which is active for a given person. Because the attribution is additive,
-the columns belonging to one attribute can be summed to give a single
-contribution per attribute, which is what the interface displays.
+One hot encoding splits a single attribute across several columns, only one of
+which is active for a given record. The attribution is additive, so those
+columns are summed to give one contribution per raw attribute.
 """
 
 import numpy as np
@@ -30,9 +28,9 @@ from src.predict import load_artefacts
 def source_attribute(column):
     """Return the raw attribute a prepared feature column came from.
 
-    Numeric columns are named after their attribute. Dummy columns are named
-    ``attribute_value``, so the attribute is recovered by matching the known
-    categorical names against the prefix.
+    Numeric columns carry the attribute name. Dummy columns are named
+    ``attribute_value``, so the prefix is matched against the known categorical
+    names.
     """
     for attribute in config.CATEGORICAL_COLS:
         if column.startswith(f"{attribute}_"):
@@ -43,8 +41,8 @@ def source_attribute(column):
 def column_contributions(scaled, feature_names):
     """Return the log odds contribution of every prepared feature column.
 
-    The final element of the booster output is the bias term and is returned
-    separately rather than as a column.
+    The final element of the booster output is the bias term, returned
+    separately.
     """
     booster = load_artefacts()["booster"]
     matrix = xgb.DMatrix(scaled)
@@ -67,13 +65,13 @@ def describe_values(record):
 
 
 def explain(result):
-    """Decompose a scored person into contributions grouped by attribute.
+    """Decompose a scored record into contributions grouped by attribute.
 
     ``result`` is the dictionary returned by ``src.predict.score_person``.
 
     Returns the attribute table sorted by absolute contribution, the bias term,
-    the reconstructed log odds, the probability, and the reconstruction error
-    that proves the decomposition is exact.
+    the reconstructed log odds, the probability, and the difference between that
+    probability and the one the model reported.
     """
     contributions, bias = column_contributions(result["scaled"], result["feature_names"])
 
@@ -103,10 +101,7 @@ def explain(result):
 
 
 def top_factor(explanation, direction=None):
-    """Return the single largest contribution, optionally in one direction.
-
-    Used by the chatbot when asked which factor mattered most.
-    """
+    """Return the single largest contribution, optionally in one direction."""
     table = explanation["table"]
 
     if direction == "towards":

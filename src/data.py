@@ -1,14 +1,13 @@
 """Loading and feature preparation for the UCI Adult census dataset.
 
-This module is the single definition of how raw census records become model
-inputs. It is imported by the training script, by the inference path used at
-runtime, and by the analysis notebook, so that all three apply identical
-transformations.
+The single definition of how a raw census record becomes model input. Imported
+by the training script, the inference path and the analysis notebook, so that
+all three apply identical transformations.
 
-The preparation is described by a schema dictionary produced when fitting on
-the training data. Passing that schema back in reproduces the same encoding on
-any later data, including a single unlabelled record entered through the
-application.
+Fitting returns a schema dictionary recording the retained country categories,
+the levels of each categorical field and the final column order. Passing that
+schema back reapplies those decisions to later data, including a single
+unlabelled record entered through the application.
 """
 
 import pandas as pd
@@ -56,12 +55,11 @@ def _group_rare_countries(series, country_categories):
 def prepare_features(df_raw, schema=None):
     """Convert raw records into the numeric feature matrix the models expect.
 
-    Passing ``schema=None`` fits the preparation on the supplied data, which is
-    the training path. Passing a schema returned by an earlier call reapplies
-    those fitted decisions, which is the path used for the held-out test file
-    and for a single record entered at runtime.
+    With ``schema=None`` the preparation is fitted on the supplied data and the
+    resulting schema returned. With a schema supplied, those already fitted
+    decisions are reapplied unchanged.
 
-    Returns a tuple of the prepared DataFrame and the schema used.
+    Returns the prepared DataFrame and the schema used.
     """
     df = df_raw.drop(columns=config.DROP_COLS, errors="ignore").copy()
     df = df.drop(columns=[config.TARGET], errors="ignore")
@@ -104,10 +102,10 @@ def prepare_features(df_raw, schema=None):
 
 
 def compute_defaults(df_raw):
-    """Derive fallback values for fields the interface does not ask about.
+    """Derive fallback values for unanswered fields.
 
-    Numeric fields take the median and categorical fields the mode, computed on
-    the training data only. Returned as a plain dictionary keyed by column name.
+    Median for numeric fields, mode for categorical, computed on the training
+    rows only. Returned as a dictionary keyed by column name.
     """
     df = df_raw.drop(columns=config.DROP_COLS, errors="ignore")
     defaults = {}
@@ -123,12 +121,11 @@ def compute_defaults(df_raw):
 
 
 def build_person(answers, defaults):
-    """Assemble one record from partial user input.
+    """Assemble one record from partial input.
 
-    Any field absent from ``answers`` is taken from ``defaults``. Returns a
-    single-row DataFrame in the raw column layout, ready to pass through
-    ``prepare_features``, together with the sorted list of fields that fell back
-    to a default value.
+    Fields absent from ``answers`` are taken from ``defaults``. Returns a
+    single-row DataFrame in the raw column layout and the sorted list of fields
+    that took a default.
     """
     record = dict(defaults)
     supplied = {k: v for k, v in answers.items() if v is not None}

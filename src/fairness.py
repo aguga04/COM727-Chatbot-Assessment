@@ -1,11 +1,10 @@
-"""Audit the deployed model for the limitations section of the report.
+"""Audit the deployed classifier for group disparity.
 
-Run from the repository root with ``python -m src.fairness``. Results are written
-to ``models/fairness_report.json`` so that every figure the application states
-about fairness is regenerable, and so that no number is ever typed into the
-interface by hand.
+Run from the repository root with ``python -m src.fairness``. Results are
+written to ``models/fairness_report.json``, which the application reads, so no
+figure is written into the interface by hand.
 
-Four experiments, in the order the argument is made.
+Four experiments.
 
 1. Group outcome rates. How often the deployed model predicts the upper bracket
    for each group, and how often it is right when it does.
@@ -18,8 +17,8 @@ Four experiments, in the order the argument is made.
 4. Proxy recovery. Train a classifier to predict sex from the remaining columns,
    first with the household role column present and then with it removed.
 
-The point the four make together is that deleting a protected attribute does not
-delete the information, because other columns carry it.
+Taken together the four measure whether deleting a protected attribute removes
+the information it carries. On this dataset it does not.
 """
 
 import json
@@ -92,10 +91,9 @@ def experiment_group_rates(test):
 def flip_sex(df_raw, swap_household_role):
     """Return a copy with the sex field reversed on every record.
 
-    When ``swap_household_role`` is set, husband and wife are exchanged as well,
-    so the record remains internally consistent. Without it, the counterfactual
-    produces combinations the training data never contained, which is itself part
-    of the finding.
+    With ``swap_household_role`` set, husband and wife are exchanged as well, so
+    the record stays internally consistent. Without it, the result includes
+    combinations the training data never contained.
     """
     flipped = df_raw.copy()
     flipped["sex"] = flipped["sex"].map({"Male": "Female", "Female": "Male"})

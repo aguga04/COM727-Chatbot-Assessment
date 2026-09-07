@@ -1,10 +1,9 @@
 """Load the trained artefacts and score individual records.
 
-The application never fits a model. This module reads what ``src.train`` wrote
-and applies it, using the same preparation the model was trained on.
+The application does not fit a model. This module reads what ``src.train``
+wrote and applies it with the preparation the model was trained on.
 
-Artefacts are loaded once and reused. The loading function is cached at module
-level so that repeated calls during a session do not reread the files.
+Artefacts are loaded once and cached at module level.
 """
 
 import json
@@ -52,9 +51,9 @@ def load_artefacts():
 def version_report():
     """Compare the libraries in use against those recorded at training time.
 
-    Returns a list of human readable warnings, empty when everything matches.
-    The scaler is a pickled object, so a scikit-learn mismatch can change its
-    behaviour silently rather than raising; this check makes that visible.
+    Returns a list of warnings, empty when everything matches. The scaler is a
+    pickled object, so a scikit-learn mismatch can alter its behaviour without
+    raising.
     """
     recorded = load_artefacts()["metadata"]["versions"]
     installed = {"xgboost": xgb.__version__, "scikit_learn": sklearn.__version__}
@@ -70,12 +69,11 @@ def version_report():
 
 
 def complete_record(answers):
-    """Fill in the fields the interface does not ask for.
+    """Complete a partial set of answers.
 
-    Education level and years of education are two encodings of the same
-    attribute, so the numeric form is derived from the categorical one rather
-    than defaulted. Everything else absent from ``answers`` falls back to the
-    training median or mode.
+    Years of education are derived from the qualification, since the two record
+    the same attribute. Anything else absent falls back to the training median
+    or mode.
 
     Returns a single-row DataFrame and the sorted list of defaulted fields.
     """
@@ -92,8 +90,8 @@ def complete_record(answers):
 def prepare_matrix(df_raw):
     """Turn raw records into the scaled feature matrix the booster expects.
 
-    Applies the fitted encoding and the fitted scaler in that order. Returns the
-    matrix and the ordered feature names.
+    Applies the fitted encoding then the fitted scaler. Returns the matrix and
+    the ordered feature names.
     """
     artefacts = load_artefacts()
     features, _ = prepare_features(df_raw, artefacts["schema"])
@@ -109,11 +107,10 @@ def predict_probabilities(df_raw):
 
 
 def score_person(answers):
-    """Score one person described as a dictionary of answers.
+    """Score one record described as a dictionary of answers.
 
-    Returns the predicted probability, the record as it was scored, the fields
-    that fell back to a default, and the scaled feature row for the explanation
-    module to decompose.
+    Returns the predicted probability, the completed record, the fields that
+    took a default, and the scaled feature row for the explanation module.
     """
     record, defaulted = complete_record(answers)
     scaled, feature_names = prepare_matrix(record)

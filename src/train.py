@@ -48,13 +48,11 @@ MODEL_PARAMS = {
 
 VALIDATION_SIZE = 0.2
 
-# Smoothing is lighter than the usual default because the patterns are hand
-# written and sparse. At the default of 1.0 the model is correct on every
-# display string but half of them clear only 0.39 confidence, leaving no room to
-# set a meaningful fallback threshold. At 0.1 it becomes overconfident, with a
-# median above 0.96, which makes a threshold meaningless in the other direction.
-# Measured on this intent set, 0.3 keeps accuracy and spreads the confidences
-# usefully.
+# Smoothing is lighter than the default of 1.0 because the patterns are hand
+# written and sparse. All candidate values classify every display string
+# correctly, so the choice was made on the confidence spread: 1.0 leaves half the
+# buttons near 0.39, and 0.1 pushes the median above 0.96. Neither leaves room
+# for a meaningful fallback threshold.
 INTENT_ALPHA = 0.3
 
 # Presence rather than counts. A question is short enough that a word rarely

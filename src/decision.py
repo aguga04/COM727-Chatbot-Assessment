@@ -6,15 +6,12 @@ uncertain middle band that is escalated to a human assessor rather than decided
 automatically. This is the accept, refer, decline pattern used in credit and
 lending screening.
 
-The boundaries are read from ``models/decision_thresholds.json``, which the
-notebook writes when it selects them. They are not literals in this file, so a
-change of policy is a rerun of that analysis rather than an edit to code, and
-every figure the application states about the bands is traceable to the run that
-produced it.
+Boundaries are read from ``models/decision_thresholds.json``, written by the
+notebook when it selects them. They are not literals in this file, so a change
+of policy is a rerun of that analysis rather than an edit to code.
 
-The wording returned here never states what a person earns. It states what the
-model predicts about which side of the threshold they fall on, which is a
-different and defensible claim.
+The wording returned here does not state what a person earns. It states which
+side of the threshold the model places them on.
 """
 
 import json
@@ -69,9 +66,9 @@ def load_thresholds():
 def band_of(probability):
     """Return the band key for a probability.
 
-    The boundaries follow the analysis exactly: below the lower bound is the
-    lower band, above the upper bound is the upper band, and the boundaries
-    themselves fall inside the referral band.
+    Boundaries follow the analysis: below the lower bound is the lower band,
+    above the upper bound is the upper band, and the boundaries themselves fall
+    inside the referral band.
     """
     thresholds = load_thresholds()
 
@@ -110,10 +107,10 @@ def decide(probability):
 
 
 def band_evidence():
-    """Return the figures that justify the boundaries, for display and for the chatbot.
+    """Return the figures supporting the boundaries.
 
-    Every value comes from the validation analysis rather than from this module,
-    so a rerun of the notebook updates what the application says.
+    Every value comes from the validation analysis, so a rerun of the notebook
+    updates what the application reports.
     """
     thresholds = load_thresholds()
 

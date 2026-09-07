@@ -10,6 +10,7 @@ time the user touches anything.
 Sections marked below are filled in by later phases.
 """
 
+import html
 import json
 
 import numpy as np
@@ -52,21 +53,31 @@ COLOURS = {
 
 @st.cache_resource(show_spinner="Loading the trained models")
 def startup():
-    """Load every artefact once and fetch the language corpora.
+    """Load the income classifier and, if it is available, the optional chat layer.
 
-    Cached as a resource rather than data because these objects are shared
-    across sessions and are not serialisable in any useful sense. The corpora
-    download runs here so that it happens on first use rather than on import,
-    which is what stops a deployed application failing on its first message.
+    The income classifier is the required part of this system, so it is loaded
+    first and never depends on anything optional. The conversational layer needs
+    language corpora that are downloaded on first use rather than shipped with
+    the package, and a blocked download must not be able to prevent an
+    assessment. Its failure is recorded and reported rather than raised.
+
+    Cached as a resource because these objects are shared across sessions and
+    are not serialisable in any useful sense.
     """
-    ensure_corpora()
-
     artefacts = load_artefacts()
     load_thresholds()
+
+    chat_available, chat_error = True, None
+    try:
+        ensure_corpora()
+    except Exception as failure:
+        chat_available, chat_error = False, str(failure)
 
     return {
         "metadata": artefacts["metadata"],
         "warnings": version_report(),
+        "chat_available": chat_available,
+        "chat_error": chat_error,
     }
 
 
@@ -155,16 +166,19 @@ def header(metadata):
         help="Of every 100 people the model has never seen, it puts this many on the "
              "correct side of the income threshold.")
     columns[1].metric(
-        "Recall", f"{held_out['recall']:.1%}",
+        "Held-out recall", f"{held_out['recall']:.1%}",
         help="Of the people who genuinely are above the threshold, this share is "
              "correctly identified. The rest are missed.")
     rows = metadata["rows"]
+    thousands = lambda value: f"{round(value / 1000):,}k"
     columns[2].metric(
-        "Data split",
-        f"{rows['train']:,} / {rows['validation']:,} / {rows['held_out_test']:,}",
-        help="Training, validation, and held back for final testing. The held-back "
-             "records were never seen during training, so the accuracy shown here is "
-             "not flattered by memorisation.")
+        "Train / val / test",
+        " / ".join(thousands(rows[key]) for key in
+                   ("train", "validation", "held_out_test")),
+        help=f"{rows['train']:,} training records, {rows['validation']:,} for "
+             f"validation and {rows['held_out_test']:,} held back for final testing. "
+             "The held-back records were never seen during training, so the accuracy "
+             "shown here is not flattered by memorisation.")
     columns[3].metric(
         "Attributes used", metadata["feature_count"],
         help="Thirteen real world attributes become this many numeric columns once "
@@ -341,12 +355,17 @@ def leaning_sentence(probability, band):
 
 
 def result_banner(name, colour):
-    """Draw the centred heading that opens the result."""
+    """Draw the centred heading that opens the result.
+
+    The name is user supplied and is inserted into markup, so it is escaped
+    first. Without this, text typed into the name field would be rendered as
+    HTML rather than displayed as characters.
+    """
     st.markdown(
         f"<div style='background:{colour};border-radius:6px;padding:0.55rem 1rem;"
         f"text-align:center;margin:0.2rem 0 0.9rem 0'>"
         f"<span style='color:#FFFFFF;font-size:1.25rem;font-weight:700;"
-        f"letter-spacing:0.01em'>Results for {name}</span></div>",
+        f"letter-spacing:0.01em'>Results for {html.escape(name)}</span></div>",
         unsafe_allow_html=True,
     )
 
@@ -437,11 +456,12 @@ def show_outcome(assessment):
     if untouched:
         listed = ", ".join(config.FIELD_LABELS.get(f, f).lower() for f in untouched)
         st.caption(
-            f"Left at the training default: {listed}. These contribute to the result "
-            "like any other answer, so a default is an assumption rather than a blank."
+            f"Matching the training default: {listed}. Whether these were chosen or "
+            "left alone, they contribute to the result like any other answer, so a "
+            "default value is an assumption rather than a blank."
         )
     else:
-        st.caption("Every field was set deliberately. Nothing was assumed.")
+        st.caption("No field matches its training default. Nothing was assumed.")
 
     st.caption(
         "This describes patterns in 1994 census data, not this person. It is not a "
@@ -633,7 +653,7 @@ def explanation_tab():
 
     st.plotly_chart(contribution_chart(table), width="stretch")
 
-    with st.expander("Check how these figures add up (technical)"):
+    with st.expander("Check these figures add up (technical)"):
         st.caption(
             "The chart above shows what each attribute did. This shows that those "
             "figures rebuild the model's own output exactly rather than "
@@ -720,13 +740,41 @@ def question_panel(grouped, ready):
                     st.rerun()
 
 
-def conversation_tab():
-    """Ask questions about the assessment, the model and the data."""
+def conversation_tab(chat_available, chat_error):
+    """Ask questions about the assessment, the model and the data.
+
+    This is an optional extension rather than part of the required classifier
+    interface. If its language resources are unavailable it reports that and
+    stops, leaving the assessment and explanation tabs working.
+    """
+    if not chat_available:
+        st.warning(
+            "The question and answer feature is unavailable because its language "
+            "resources could not be downloaded. This is an optional extension; the "
+            "assessment and explanation tabs are unaffected.",
+            icon="⚠",
+        )
+        with st.expander("Technical detail"):
+            st.caption(
+                "The intent classifier needs three NLTK corpora, wordnet, omw-1.4 "
+                "and stopwords, which are fetched on first run rather than shipped "
+                "with the package. Run `python -c \"import nltk; "
+                "nltk.download(\'wordnet\')\"` to test network access."
+            )
+            st.code(chat_error or "no detail reported")
+        return
+
     ready = st.session_state.assessment is not None
     grouped = question_buttons(ready)
     available = sum(len(questions) for questions in grouped.values())
 
     st.subheader("Ask about this model")
+    st.caption(
+        "This tab is an optional extension. The required classification interface "
+        "is the Assessment tab, which sends a new record to the trained income "
+        "model. The questions here are routed by a separate intent classifier that "
+        "plays no part in predicting income."
+    )
     st.caption(
         f"{available} questions available"
         + ("." if ready else ", and more once someone has been assessed.")
@@ -937,24 +985,23 @@ def main():
     header(context["metadata"])
     show_warnings(context["warnings"])
 
-    tabs = st.tabs(["Assessment", "Why", "Ask", "Model and limitations"])
+    tabs = st.tabs(["Assessment", "Why", "Ask (optional)", "Model and limitations"])
 
     with tabs[0]:
         assessment_tab()
     with tabs[1]:
         explanation_tab()
     with tabs[2]:
-        conversation_tab()
+        conversation_tab(context["chat_available"], context["chat_error"])
     with tabs[3]:
         model_tab()
 
     st.divider()
     trained = context["metadata"]["trained_at"][:10]
     st.caption(
-        f"Model trained {trained} on the UCI Adult dataset, 1994 US Census. "     
-        "Disclaimer. Coursework only. Predictions describe patterns in that data and are not advice about "
-        "anyone's earnings. "
-        "Using it for a real decision would risk indirect discrimination under the Equality Act 2010."
+        f"Model trained {trained} on the UCI Adult dataset, 1994 US Census. "
+        "Predictions describe patterns in that data and are not advice about "
+        "anyone's earnings."
     )
 
 
