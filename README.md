@@ -13,7 +13,7 @@ decision would risk indirect discrimination under the Equality Act 2010.
 Group project by [Team Nexus](#team-nexus-members) for COM727 Introduction to AI, MSc Applied AI and
 Data Science, Southampton Solent University.
 
-**Live application:** _pending deployment_
+**Live application:** https://nexuschatbot.streamlit.app/
 
 ---
 
